@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
@@ -17,7 +18,7 @@ export default async function DashboardPage() {
     .eq("id", user.id)
     .single();
 
-  const { data: subjects } = await supabase.from("subjects").select("code, name");
+  const isTeacher = profile?.role === "teacher";
 
   return (
     <div className="min-h-screen bg-slate-50 px-6 py-10">
@@ -27,25 +28,19 @@ export default async function DashboardPage() {
             สวัสดี, {profile?.full_name ?? user.email}
           </h1>
           <p className="text-slate-500 text-sm">
-            บทบาท: {profile?.role === "teacher" ? "ครู" : "นักเรียน"}
+            บทบาท: {isTeacher ? "ครู" : "นักเรียน"}
           </p>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-6">
-          <h2 className="font-medium text-slate-700 mb-3">รายวิชา</h2>
-          <ul className="space-y-2 text-sm text-slate-600">
-            {subjects?.length ? (
-              subjects.map((s) => (
-                <li key={s.code} className="border-b border-slate-100 pb-2">
-                  {s.name}
-                </li>
-              ))
-            ) : (
-              <li className="text-slate-400">
-                ยังไม่มีรายวิชา — ครูสามารถเพิ่มได้จาก Supabase Table Editor
-              </li>
-            )}
-          </ul>
+        <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-3">
+          <Link href="/dashboard/courses" className="block text-slate-700 font-medium hover:underline">
+            รายวิชาของฉัน →
+          </Link>
+          {isTeacher && (
+            <Link href="/dashboard/admin" className="block text-slate-700 font-medium hover:underline">
+              จัดการวิชา / ปีการศึกษา →
+            </Link>
+          )}
         </div>
       </div>
     </div>
