@@ -4,13 +4,28 @@
 
 ## เตรียมเครื่องมือ
 
+**0. ลงไดรเวอร์ USB ก่อน** — บอร์ดส่วนใหญ่ใช้ชิป **CH340** (Windows ต้องลง `CH341SER driver`
+จากเว็บผู้ผลิต WCH) หรือ **CP2102** (ลง `CP210x VCP driver` จาก Silicon Labs)
+macOS และ Linux รุ่นใหม่มักมีมาให้แล้ว
+
+เช็กว่าสำเร็จโดยเสียบบอร์ดแล้วดูว่าเมนู Tools › Port มีพอร์ตใหม่โผล่มาไหม
+ถ้าไม่มี อาจเป็นเพราะไดรเวอร์ยังไม่ติด หรือสาย USB ที่ใช้เป็นสายชาร์จที่ส่งข้อมูลไม่ได้
+
 1. **Arduino IDE** → Preferences → Additional Board Manager URLs ใส่
    `https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json`
 2. Boards Manager → ติดตั้ง **esp32 by Espressif Systems**
 3. Library Manager → ติดตั้ง **DHT sensor library** (Adafruit) และ **Adafruit Unified Sensor**
-4. เลือกบอร์ด **ESP32 Dev Module**, Upload Speed 921600
+4. Tools → Board: **ESP32 Dev Module** · Flash Size: **4MB (32Mb)** · Upload Speed: 921600
+   (ถ้าอัปโหลดไม่ผ่าน ลดเป็น **115200** — ชิป CH340 บางตัวไม่ทนความเร็วสูง)
 
-ถ้าอัปโหลดแล้วค้างที่ `Connecting...` ให้กดปุ่ม **BOOT** บนบอร์ดค้างไว้ตอนเริ่มอัปโหลด
+บอร์ดส่วนใหญ่มีวงจร auto-reset จึงเข้าโหมดอัปโหลดเองโดยไม่ต้องกดปุ่ม
+ถ้าค้างที่ `Connecting......___` ให้กดปุ่ม **BOOT** ค้างไว้ตอนข้อความนั้นขึ้น แล้วปล่อยเมื่อเริ่มอัปโหลด
+
+## ⚠️ ก่อนต่อสาย
+
+ต่อขา VCC ของ DHT11 เข้า **3V3 เท่านั้น ห้ามต่อ 5V** เพราะขา I/O ของ ESP32 ทนได้แค่ 3.3V
+ถ้าเลี้ยงเซนเซอร์ด้วย 5V ขา DATA จะส่งสัญญาณ 5V กลับเข้า GPIO 4 แล้วขานั้นจะพังถาวร
+(บทความ DHT11 ส่วนใหญ่เขียนจากฝั่ง Arduino Uno ซึ่งใช้ 5V ได้ — ใช้ตามไม่ได้กับ ESP32)
 
 ## ตั้งค่า
 
