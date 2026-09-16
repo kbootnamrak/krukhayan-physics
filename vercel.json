@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/iot/cron/offline-check",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 22 * * *"
     }
   ]
 }
