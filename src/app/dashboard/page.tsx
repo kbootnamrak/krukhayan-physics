@@ -41,6 +41,9 @@ export default async function DashboardPage() {
               จัดการวิชา / ปีการศึกษา →
             </Link>
           )}
+          <Link href="/dashboard/account" className="block text-slate-700 font-medium hover:underline">
+            บัญชีของฉัน / เปลี่ยนรหัสผ่าน →
+          </Link>
         </div>
       </div>
     </div>
