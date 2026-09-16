@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { calcGrade, DEFAULT_GRADE_SCALE } from "@/lib/grade";
 import UnitsPanel from "./UnitsPanel";
 import ScoresPanel from "./ScoresPanel";
-import StudentsPanel from "./StudentsPanel";
+import StudentsPanel, { type RosterRow } from "./StudentsPanel";
 import MaterialsPanel from "./MaterialsPanel";
 
 type Tab = "units" | "scores" | "students" | "materials" | "grade";
@@ -26,6 +26,7 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
   const [enrollments, setEnrollments] = useState<{ id: string; student_id: string; profiles: { full_name: string; student_code: string | null } | null }[]>([]);
   const [scores, setScores] = useState<{ enrollment_id: string; source_type: "unit_component" | "exam"; source_id: string; score: number | null }[]>([]);
   const [materials, setMaterials] = useState<{ id: string; title: string; link_url: string | null }[]>([]);
+  const [roster, setRoster] = useState<RosterRow[]>([]);
 
   const load = useCallback(async () => {
     const { data: userData } = await supabase.auth.getUser();
@@ -70,6 +71,15 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
       .select("id, student_id, profiles(full_name, student_code)")
       .eq("course_id", courseId);
     setEnrollments((enrollData as unknown as typeof enrollments) ?? []);
+
+    if (teacher) {
+      const { data: rosterData } = await supabase
+        .from("class_roster")
+        .select("id, student_code, full_name, claimed_by, claimed_at")
+        .eq("course_id", courseId)
+        .order("student_code");
+      setRoster((rosterData as RosterRow[]) ?? []);
+    }
 
     const enrollIds = (enrollData ?? []).map((e) => e.id);
     const { data: scoreData } = enrollIds.length
@@ -153,7 +163,7 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
         )}
 
         {tab === "students" && isTeacher && (
-          <StudentsPanel courseId={courseId} enrollments={enrollments} onChanged={load} />
+          <StudentsPanel courseId={courseId} roster={roster} onChanged={load} />
         )}
 
         {tab === "materials" && (

@@ -2,20 +2,29 @@
 
 import { useState } from "react";
 import * as XLSX from "xlsx";
+import { SCHOOL_EMAIL_DOMAIN } from "@/lib/school";
 
-type Enrollment = { id: string; profiles: { full_name: string; student_code: string | null } | null };
+export type RosterRow = {
+  id: string;
+  student_code: string;
+  full_name: string;
+  claimed_by: string | null;
+  claimed_at: string | null;
+};
 
 export default function StudentsPanel({
   courseId,
-  enrollments,
+  roster,
   onChanged,
 }: {
   courseId: string;
-  enrollments: Enrollment[];
+  roster: RosterRow[];
   onChanged: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [log, setLog] = useState<string[]>([]);
+
+  const signedIn = roster.filter((r) => r.claimed_by !== null).length;
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -31,7 +40,6 @@ export default function StudentsPanel({
       const payload = rows.map((r) => ({
         student_code: String(r["รหัสนักเรียน"] ?? r["student_code"] ?? "").trim(),
         full_name: String(r["ชื่อ-สกุล"] ?? r["full_name"] ?? "").trim(),
-        email: r["อีเมล"] ?? r["email"] ? String(r["อีเมล"] ?? r["email"]).trim() : undefined,
       }));
 
       const res = await fetch("/api/students/import", {
@@ -43,7 +51,11 @@ export default function StudentsPanel({
       if (data.error) {
         setLog([`เกิดข้อผิดพลาด: ${data.error}`]);
       } else {
-        setLog((data.results as { student_code: string; status: string }[]).map((r) => `${r.student_code}: ${r.status}`));
+        setLog(
+          (data.results as { student_code: string; status: string }[]).map(
+            (r) => `${r.student_code}: ${r.status}`
+          )
+        );
       }
       onChanged();
     } finally {
@@ -56,7 +68,11 @@ export default function StudentsPanel({
     <div className="space-y-4">
       <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-2">
         <p className="text-sm text-slate-600">
-          อัปโหลดไฟล์ Excel (.xlsx) คอลัมน์ที่ต้องมี: <b>รหัสนักเรียน</b>, <b>ชื่อ-สกุล</b>, และ <b>อีเมล</b> (ถ้ามี — ถ้าไม่มีระบบจะสร้างอีเมลจำลองให้อัตโนมัติ)
+          อัปโหลดไฟล์ Excel (.xlsx) คอลัมน์ที่ต้องมี: <b>รหัสนักเรียน</b> และ <b>ชื่อ-สกุล</b>
+        </p>
+        <p className="text-xs text-slate-500">
+          ไม่ต้องใส่อีเมล — ระบบจับคู่จากรหัสนักเรียนกับบัญชี Google ของโรงเรียน
+          (<code>รหัสนักเรียน@{SCHOOL_EMAIL_DOMAIN}</code>) ให้อัตโนมัติตอนนักเรียนเข้าระบบครั้งแรก
         </p>
         <input type="file" accept=".xlsx,.xls" onChange={handleFile} disabled={busy} className="text-sm" />
         {busy && <p className="text-sm text-slate-400">กำลังนำเข้า...</p>}
@@ -69,12 +85,38 @@ export default function StudentsPanel({
         )}
       </div>
 
+      {roster.length > 0 && (
+        <p className="text-sm text-slate-600">
+          เข้าระบบแล้ว <b className="text-slate-800">{signedIn}</b> จาก{" "}
+          <b className="text-slate-800">{roster.length}</b> คน
+          {signedIn < roster.length && (
+            <span className="text-slate-400">
+              {" "}
+              — คนที่ยังไม่เข้ายังไม่เห็นคะแนนของตัวเอง
+            </span>
+          )}
+        </p>
+      )}
+
       <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100">
-        {enrollments.length === 0 && <p className="p-4 text-sm text-slate-400">ยังไม่มีนักเรียนในวิชานี้</p>}
-        {enrollments.map((en) => (
-          <div key={en.id} className="p-3 text-sm flex justify-between">
-            <span>{en.profiles?.full_name}</span>
-            <span className="text-slate-400">{en.profiles?.student_code}</span>
+        {roster.length === 0 && (
+          <p className="p-4 text-sm text-slate-400">ยังไม่มีรายชื่อนักเรียนในวิชานี้</p>
+        )}
+        {roster.map((r) => (
+          <div key={r.id} className="p-3 text-sm flex items-center justify-between gap-3">
+            <div>
+              <p className="text-slate-700">{r.full_name}</p>
+              <p className="text-xs text-slate-400">{r.student_code}</p>
+            </div>
+            <span
+              className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${
+                r.claimed_by
+                  ? "bg-green-50 text-green-800 border border-green-200"
+                  : "bg-slate-50 text-slate-500 border border-slate-200"
+              }`}
+            >
+              {r.claimed_by ? "● เข้าระบบแล้ว" : "○ ยังไม่เคยเข้า"}
+            </span>
           </div>
         ))}
       </div>

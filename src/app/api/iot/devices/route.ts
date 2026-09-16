@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireTeacher } from "@/lib/iot/auth";
-import { adminClient } from "@/lib/iot/admin";
+import { requireTeacher } from "@/lib/auth";
+import { adminClient } from "@/lib/supabase/admin";
 import { createDeviceKey } from "@/lib/iot/deviceKey";
 
 /** เกณฑ์เริ่มต้น — ตั้งให้พอใช้งานได้ทันที ครูปรับเองได้ในหน้าอุปกรณ์ */

@@ -1,77 +1,85 @@
 import { NextResponse } from "next/server";
-import { createClient as createServerClient } from "@/lib/supabase/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { requireTeacher } from "@/lib/auth";
+import { adminClient } from "@/lib/supabase/admin";
+import { SCHOOL_EMAIL_DOMAIN } from "@/lib/school";
 
-type Row = { student_code: string; full_name: string; email?: string };
+type Row = { student_code: string; full_name: string };
 
+/**
+ * นำเข้ารายชื่อนักเรียนจาก Excel
+ *
+ * ไม่สร้างบัญชีให้นักเรียนอีกต่อไป — เดิมเคยสร้างบัญชีด้วยอีเมลปลอมและสุ่ม
+ * รหัสผ่านที่ไม่มีใครได้เห็น นักเรียนจึงล็อกอินไม่ได้เลย
+ *
+ * ตอนนี้แค่บันทึกรายชื่อไว้ แล้วบัญชีจะถูกจับคู่อัตโนมัติตอนนักเรียนล็อกอิน
+ * ด้วย Google ของโรงเรียนครั้งแรก (อีเมลตั้งตามรหัสนักเรียน)
+ */
 export async function POST(request: Request) {
-  // ต้อง login เป็นครูของ course นี้เท่านั้น
-  const supabase = await createServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-  if (profile?.role !== "teacher") {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  }
+  const auth = await requireTeacher();
+  if (!auth.ok) return auth.response;
 
   const { courseId, rows } = (await request.json()) as { courseId: string; rows: Row[] };
   if (!courseId || !Array.isArray(rows) || rows.length === 0) {
     return NextResponse.json({ error: "invalid payload" }, { status: 400 });
   }
 
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!serviceKey) {
-    return NextResponse.json({ error: "server missing SUPABASE_SERVICE_ROLE_KEY" }, { status: 500 });
-  }
-  const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey);
-
+  const admin = adminClient();
   const results: { student_code: string; status: string }[] = [];
 
   for (const row of rows) {
     const studentCode = String(row.student_code ?? "").trim();
     const fullName = String(row.full_name ?? "").trim();
+
     if (!studentCode || !fullName) {
       results.push({ student_code: studentCode || "(ไม่ระบุ)", status: "ข้าม: ข้อมูลไม่ครบ" });
       continue;
     }
-    const email = row.email?.trim() || `${studentCode}@krukhayan-physics.local`;
 
-    // หา profile เดิมจากรหัสนักเรียนก่อน
-    const { data: existingProfile } = await admin
+    const { data: roster, error: rosterError } = await admin
+      .from("class_roster")
+      .upsert(
+        { course_id: courseId, student_code: studentCode, full_name: fullName },
+        { onConflict: "course_id,student_code" }
+      )
+      .select("id, claimed_by")
+      .single();
+
+    if (rosterError || !roster) {
+      results.push({ student_code: studentCode, status: `ไม่สำเร็จ: ${rosterError?.message}` });
+      continue;
+    }
+
+    if (roster.claimed_by) {
+      results.push({ student_code: studentCode, status: "มีอยู่แล้ว (เข้าระบบแล้ว)" });
+      continue;
+    }
+
+    // ถ้านักเรียนคนนี้เคยล็อกอินไว้ก่อนที่ครูจะนำเข้ารายชื่อ ให้จับคู่ให้เลย
+    const { data: existing } = await admin
       .from("profiles")
       .select("id")
       .eq("student_code", studentCode)
       .maybeSingle();
 
-    let studentId = existingProfile?.id as string | undefined;
-
-    if (!studentId) {
-      const { data: created, error: createErr } = await admin.auth.admin.createUser({
-        email,
-        password: `Std-${studentCode}-${Math.random().toString(36).slice(2, 8)}`,
-        email_confirm: true,
-        user_metadata: { full_name: fullName },
-      });
-      if (createErr || !created.user) {
-        results.push({ student_code: studentCode, status: `สร้างบัญชีไม่สำเร็จ: ${createErr?.message}` });
-        continue;
-      }
-      studentId = created.user.id;
-      await admin.from("profiles").insert({
-        id: studentId,
-        full_name: fullName,
-        role: "student",
-        student_code: studentCode,
-      });
+    if (!existing) {
+      results.push({ student_code: studentCode, status: "เพิ่มแล้ว — รอนักเรียนเข้าระบบ" });
+      continue;
     }
 
-    const { error: enrollErr } = await admin
+    await admin
       .from("enrollments")
-      .upsert({ course_id: courseId, student_id: studentId }, { onConflict: "course_id,student_id" });
+      .upsert(
+        { course_id: courseId, student_id: existing.id },
+        { onConflict: "course_id,student_id", ignoreDuplicates: true }
+      );
 
-    results.push({ student_code: studentCode, status: enrollErr ? `ลงทะเบียนไม่สำเร็จ: ${enrollErr.message}` : "สำเร็จ" });
+    await admin
+      .from("class_roster")
+      .update({ claimed_by: existing.id, claimed_at: new Date().toISOString() })
+      .eq("id", roster.id);
+
+    results.push({ student_code: studentCode, status: "เพิ่มและลงทะเบียนให้แล้ว" });
   }
 
-  return NextResponse.json({ results });
+  return NextResponse.json({ results, domain: SCHOOL_EMAIL_DOMAIN });
 }

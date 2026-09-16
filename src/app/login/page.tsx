@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { SCHOOL_EMAIL_DOMAIN } from "@/lib/school";
 import AuthHashNotice from "@/app/AuthHashNotice";
 
 const AUTH_ERRORS: Record<string, string> = {
@@ -11,6 +12,7 @@ const AUTH_ERRORS: Record<string, string> = {
   otp_expired: "ลิงก์ในอีเมลหมดอายุหรือถูกใช้ไปแล้ว กรุณาขอลิงก์ใหม่",
   missing_code: "ลิงก์ไม่สมบูรณ์ กรุณาขอลิงก์ใหม่",
   access_denied: "ลิงก์ในอีเมลใช้ไม่ได้ กรุณาขอลิงก์ใหม่",
+  not_school_email: `ต้องเข้าสู่ระบบด้วยบัญชี Google ของโรงเรียน (@${SCHOOL_EMAIL_DOMAIN}) เท่านั้น`,
 };
 
 function LoginForm() {
@@ -24,6 +26,25 @@ function LoginForm() {
   const linkError = authError
     ? AUTH_ERRORS[authError] ?? "ลิงก์ในอีเมลใช้ไม่ได้ กรุณาขอลิงก์ใหม่"
     : null;
+
+  async function handleGoogleLogin() {
+    setLoading(true);
+    setError(null);
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        // hd = บอก Google ให้เสนอเฉพาะบัญชีในโดเมนโรงเรียน
+        // เป็นเพียงคำใบ้ฝั่งหน้าจอ ด่านจริงอยู่ที่ /auth/callback ฝั่งเซิร์ฟเวอร์
+        queryParams: { hd: SCHOOL_EMAIL_DOMAIN, prompt: "select_account" },
+      },
+    });
+    if (error) {
+      setLoading(false);
+      setError(error.message);
+    }
+  }
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -56,6 +77,31 @@ function LoginForm() {
           </Link>
         </div>
       )}
+
+      <button
+        type="button"
+        onClick={handleGoogleLogin}
+        disabled={loading}
+        className="w-full flex items-center justify-center gap-2 border border-slate-300 rounded-md py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+      >
+        <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden>
+          <path fill="#4285F4" d="M45.1 24.5c0-1.6-.1-3.2-.4-4.7H24v8.9h11.8c-.5 2.7-2 5-4.4 6.6v5.5h7.1c4.1-3.8 6.6-9.4 6.6-16.3z" />
+          <path fill="#34A853" d="M24 46c5.9 0 10.9-2 14.5-5.3l-7.1-5.5c-2 1.3-4.5 2.1-7.4 2.1-5.7 0-10.5-3.8-12.2-9H4.5v5.7C8.1 41.2 15.5 46 24 46z" />
+          <path fill="#FBBC05" d="M11.8 28.3c-.4-1.3-.7-2.7-.7-4.3s.3-3 .7-4.3v-5.7H4.5A22 22 0 0 0 2 24c0 3.6.9 6.9 2.5 9.9l7.3-5.6z" />
+          <path fill="#EA4335" d="M24 10.6c3.2 0 6.1 1.1 8.4 3.3l6.3-6.3C34.9 4.1 29.9 2 24 2 15.5 2 8.1 6.8 4.5 13.9l7.3 5.7c1.7-5.2 6.5-9 12.2-9z" />
+        </svg>
+        เข้าสู่ระบบด้วย Google ของโรงเรียน
+      </button>
+
+      <p className="text-xs text-slate-400 text-center">
+        นักเรียนใช้บัญชี @{SCHOOL_EMAIL_DOMAIN} ของโรงเรียน
+      </p>
+
+      <div className="flex items-center gap-3 pt-1">
+        <span className="h-px flex-1 bg-slate-200" />
+        <span className="text-xs text-slate-400">หรือเข้าด้วยอีเมล (สำหรับครู)</span>
+        <span className="h-px flex-1 bg-slate-200" />
+      </div>
 
       <div className="space-y-1">
         <label className="text-sm text-slate-600">อีเมล</label>

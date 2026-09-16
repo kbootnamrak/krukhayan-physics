@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminClient } from "@/lib/iot/admin";
+import { adminClient } from "@/lib/supabase/admin";
 import { hashDeviceKey } from "@/lib/iot/deviceKey";
 import { describeEvent, evaluateRule } from "@/lib/iot/alerts";
 import { recordAndNotify } from "@/lib/iot/notify";

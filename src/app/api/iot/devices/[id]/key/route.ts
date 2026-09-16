@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireTeacher } from "@/lib/iot/auth";
-import { adminClient } from "@/lib/iot/admin";
+import { requireTeacher } from "@/lib/auth";
+import { adminClient } from "@/lib/supabase/admin";
 import { createDeviceKey } from "@/lib/iot/deviceKey";
 
 /** ออกคีย์ใหม่ให้อุปกรณ์ (คีย์เดิมใช้ไม่ได้ทันที — ต้องแฟลช config.h ใหม่) */
