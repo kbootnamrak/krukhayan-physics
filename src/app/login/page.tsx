@@ -1,15 +1,29 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import AuthHashNotice from "@/app/AuthHashNotice";
 
-export default function LoginPage() {
+const AUTH_ERRORS: Record<string, string> = {
+  link_invalid: "ลิงก์ในอีเมลหมดอายุหรือถูกใช้ไปแล้ว กรุณาขอลิงก์ใหม่",
+  otp_expired: "ลิงก์ในอีเมลหมดอายุหรือถูกใช้ไปแล้ว กรุณาขอลิงก์ใหม่",
+  missing_code: "ลิงก์ไม่สมบูรณ์ กรุณาขอลิงก์ใหม่",
+  access_denied: "ลิงก์ในอีเมลใช้ไม่ได้ กรุณาขอลิงก์ใหม่",
+};
+
+function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  const authError = useSearchParams().get("auth_error");
+  const linkError = authError
+    ? AUTH_ERRORS[authError] ?? "ลิงก์ในอีเมลใช้ไม่ได้ กรุณาขอลิงก์ใหม่"
+    : null;
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -27,48 +41,72 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
-      <form
-        onSubmit={handleLogin}
-        className="w-full max-w-sm bg-white p-8 rounded-xl shadow-sm border border-slate-200 space-y-4"
+    <form
+      onSubmit={handleLogin}
+      className="w-full max-w-sm bg-white p-8 rounded-xl shadow-sm border border-slate-200 space-y-4"
+    >
+      <h1 className="text-xl font-semibold text-slate-800">KruKhayan Physics</h1>
+      <p className="text-sm text-slate-500">เข้าสู่ระบบ</p>
+
+      {linkError && (
+        <div className="bg-amber-50 border border-amber-300 rounded-md p-3 space-y-1">
+          <p className="text-sm text-amber-900">{linkError}</p>
+          <Link href="/forgot-password" className="text-sm text-amber-900 underline underline-offset-2">
+            ขอลิงก์ใหม่ →
+          </Link>
+        </div>
+      )}
+
+      <div className="space-y-1">
+        <label className="text-sm text-slate-600">อีเมล</label>
+        <input
+          type="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"
+        />
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-sm text-slate-600">รหัสผ่าน</label>
+        <input
+          type="password"
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"
+        />
+      </div>
+
+      {error && <p className="text-sm text-red-600">{error}</p>}
+
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full bg-slate-800 text-white rounded-md py-2 text-sm font-medium disabled:opacity-50"
       >
-        <h1 className="text-xl font-semibold text-slate-800">
-          KruKhayan Physics
-        </h1>
-        <p className="text-sm text-slate-500">เข้าสู่ระบบ</p>
+        {loading ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
+      </button>
 
-        <div className="space-y-1">
-          <label className="text-sm text-slate-600">อีเมล</label>
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"
-          />
-        </div>
+      <Link
+        href="/forgot-password"
+        className="block text-sm text-slate-500 hover:text-slate-800 hover:underline text-center"
+      >
+        ลืมรหัสผ่าน?
+      </Link>
+    </form>
+  );
+}
 
-        <div className="space-y-1">
-          <label className="text-sm text-slate-600">รหัสผ่าน</label>
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"
-          />
-        </div>
-
-        {error && <p className="text-sm text-red-600">{error}</p>}
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-slate-800 text-white rounded-md py-2 text-sm font-medium disabled:opacity-50"
-        >
-          {loading ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
-        </button>
-      </form>
+export default function LoginPage() {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-slate-50 px-4">
+      <AuthHashNotice />
+      {/* useSearchParams ต้องอยู่ใต้ Suspense ไม่งั้นทั้งหน้าจะกลายเป็น dynamic */}
+      <Suspense fallback={null}>
+        <LoginForm />
+      </Suspense>
     </div>
   );
 }

@@ -44,6 +44,9 @@ export default async function DashboardPage() {
           <Link href="/dashboard/iot" className="block text-slate-700 font-medium hover:underline">
             ระบบติดตามอุณหภูมิและความชื้น →
           </Link>
+          <Link href="/dashboard/account" className="block text-slate-700 font-medium hover:underline">
+            บัญชีของฉัน / เปลี่ยนรหัสผ่าน →
+          </Link>
         </div>
       </div>
     </div>
