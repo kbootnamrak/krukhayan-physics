@@ -19,6 +19,11 @@ as $$
   );
 $$;
 
+-- RLS policy ด้านล่างเรียกฟังก์ชันนี้ authenticated จึงต้องมีสิทธิ์เรียกต่อไป
+-- ส่วน anon ไม่มี policy ไหนใช้เลย ตัดออกเพื่อไม่ให้เรียกผ่าน /rest/v1/rpc ได้
+revoke all on function public.iot_is_teacher() from public, anon;
+grant execute on function public.iot_is_teacher() to authenticated;
+
 -- ---------------------------------------------------------------------------
 -- อุปกรณ์ (ESP32 หนึ่งตัว = หนึ่งแถว)
 -- ---------------------------------------------------------------------------
