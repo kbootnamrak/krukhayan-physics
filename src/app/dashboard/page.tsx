@@ -41,6 +41,9 @@ export default async function DashboardPage() {
               จัดการวิชา / ปีการศึกษา →
             </Link>
           )}
+          <Link href="/dashboard/iot" className="block text-slate-700 font-medium hover:underline">
+            ระบบติดตามอุณหภูมิและความชื้น →
+          </Link>
         </div>
       </div>
     </div>

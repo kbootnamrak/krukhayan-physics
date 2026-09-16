@@ -40,6 +40,19 @@
 3. สร้างหน้า "จัดการคะแนน" และ "เพิ่มนักเรียน" (ยังไม่ได้สร้าง — เป็นหน้าถัดไปที่ควรทำ)
 4. Deploy ขึ้น Vercel (ฟรี) — เพิ่ม environment variables `NEXT_PUBLIC_SUPABASE_URL` และ `NEXT_PUBLIC_SUPABASE_ANON_KEY` ใน Vercel project settings ตามค่าใน `.env.local`
 
+## ระบบติดตามอุณหภูมิและความชื้น (ESP32 + DHT11)
+
+ระบบ IoT ที่ใช้ Supabase และ Vercel ชุดเดียวกับระบบคะแนน — บอร์ด ESP32 วัดค่าแล้วส่งขึ้นเว็บ
+มีกราฟย้อนหลัง ตั้งเกณฑ์ และแจ้งเตือนผ่าน LINE
+
+- เอกสารออกแบบระบบทั้งหมด: [`docs/iot/README.md`](docs/iot/README.md)
+- เฟิร์มแวร์บอร์ด: [`firmware/esp32-dht11/`](firmware/esp32-dht11/)
+- SQL สร้างตาราง: `supabase/migrations/20260916000000_iot_monitoring.sql`
+- หน้าเว็บ: `/dashboard/iot`
+
+ต้องตั้ง environment variables เพิ่ม (ดู `.env.example`): `LINE_CHANNEL_ACCESS_TOKEN`,
+`LINE_CHANNEL_SECRET`, `NEXT_PUBLIC_SITE_URL`, `CRON_SECRET`
+
 ## เว็บไซต์ที่ deploy แล้ว
 
 https://krukhayan-physics.vercel.app
