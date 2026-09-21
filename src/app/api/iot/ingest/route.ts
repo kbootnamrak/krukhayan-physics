@@ -89,6 +89,12 @@ export async function POST(request: Request) {
       const temperature = readMetric(s.temperature_c, "temperature_c");
       const humidity = readMetric(s.humidity_pct, "humidity_pct");
       if (temperature === null && humidity === null) return null;
+
+      // เซนเซอร์ตระกูล DHT ส่งเฟรมศูนย์ล้วนออกมาได้เวลาอ่านพลาด และเฟรมนั้นมี
+      // checksum ถูกต้องพอดี ฝั่งบอร์ดจึงมองว่าเป็นค่าที่ใช้ได้ ความชื้น 0% คู่กับ
+      // อุณหภูมิ 0° ไม่ใช่สภาพแวดล้อมที่เกิดขึ้นจริง — ตัดทิ้งที่นี่ด้วยอีกชั้น
+      // เพื่อให้ข้อมูลสะอาดแม้บอร์ดที่ยังไม่ได้แฟลชเฟิร์มแวร์รุ่นใหม่
+      if (temperature === 0 && humidity === 0) return null;
       return {
         device_id: device.id,
         recorded_at: resolveTimestamp(s.recorded_at, now).toISOString(),
