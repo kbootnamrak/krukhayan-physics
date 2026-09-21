@@ -28,17 +28,55 @@
 
 ## สิ่งที่ทำไว้แล้ว
 
-- หน้า login (`/login`) เชื่อม Supabase Auth
-- หน้า dashboard (`/dashboard`) แสดงชื่อผู้ใช้ + รายวิชา (ต้อง login ก่อน)
-- Middleware ป้องกันหน้า `/dashboard` สำหรับผู้ที่ยังไม่ login
+- เข้าสู่ระบบ: ครูใช้อีเมล+รหัสผ่าน · นักเรียนใช้บัญชี Google ของโรงเรียน
+- กู้รหัสผ่านและเปลี่ยนรหัสผ่านเองได้ (`/forgot-password`, `/dashboard/account`)
+- จัดการรายวิชา ปีการศึกษา หน่วยการเรียน เกณฑ์ K-P-A ข้อสอบ และคิดเกรด
+- นำเข้ารายชื่อนักเรียนจาก Excel แล้วจับคู่บัญชีให้อัตโนมัติ
+- ระบบติดตามอุณหภูมิ/ความชื้นด้วย ESP32 (ดูหัวข้อถัดไป)
 - Row Level Security ครบทุกตาราง
 
-## ขั้นตอนถัดไปที่ต้องทำ
+## ⚠️ ค้างไว้ — ต้องตั้งค่าก่อนนักเรียนจะใช้งานได้
 
-1. สร้างบัญชีครู: ไปที่ Supabase Dashboard > Authentication > Add user (ใช้อีเมลของอาจารย์) แล้ว insert แถวใน `profiles` โดยตั้ง `role = 'teacher'`
-2. เพิ่มรายวิชาใน `subjects`, สร้าง `terms` ของปีการศึกษาปัจจุบัน, สร้าง `courses` เชื่อมวิชา+เทอม+ครู
-3. สร้างหน้า "จัดการคะแนน" และ "เพิ่มนักเรียน" (ยังไม่ได้สร้าง — เป็นหน้าถัดไปที่ควรทำ)
-4. Deploy ขึ้น Vercel (ฟรี) — เพิ่ม environment variables `NEXT_PUBLIC_SUPABASE_URL` และ `NEXT_PUBLIC_SUPABASE_ANON_KEY` ใน Vercel project settings ตามค่าใน `.env.local`
+ทั้งหมดเป็นการตั้งค่าในหน้าเว็บของบริการภายนอก ไม่ต้องแก้โค้ด
+
+**1. Supabase → Site URL** (จำเป็นที่สุด — ตอนนี้ยังเป็น `localhost:3000`
+ทำให้ทุกคนที่ล็อกอินถูกพากลับไปหน้าที่เปิดไม่ได้)
+
+<https://supabase.com/dashboard/project/ypktjqtkryupmwioeojk/auth/url-configuration>
+
+| ช่อง | ค่า |
+|---|---|
+| Site URL | `https://krukhayan-physics.vercel.app` |
+| Redirect URLs | `https://krukhayan-physics.vercel.app/**` และ `http://localhost:3000/**` |
+
+**2. เปิดใช้งาน Google login**
+
+- Google Cloud Console → Credentials → OAuth client ID (Web application)
+- Authorized redirect URI: `https://ypktjqtkryupmwioeojk.supabase.co/auth/v1/callback`
+- OAuth consent screen: เลือก **Internal** ถ้าสร้างจากบัญชีโรงเรียน
+  ถ้าโรงเรียนปิด Google Cloud ไว้ ใช้ Gmail ส่วนตัวสร้างได้ แต่ต้องเลือก **External**
+  แล้วกด **Publish app** (ความปลอดภัยไม่ลดลง เพราะระบบตรวจโดเมนซ้ำฝั่งเซิร์ฟเวอร์อยู่แล้ว)
+- Supabase → Authentication → Providers → Google → เปิดและวาง Client ID/Secret
+
+**3. Vercel → environment variables** (ดู `.env.example` ประกอบ)
+
+| ตัวแปร | ใช้ทำอะไร |
+|---|---|
+| `NEXT_PUBLIC_SCHOOL_EMAIL_DOMAIN` | โดเมนโรงเรียน (โค้ดตั้งค่าเริ่มต้นเป็น `urrw.ac.th` ไว้แล้ว) |
+| `LINE_CHANNEL_ACCESS_TOKEN`, `LINE_CHANNEL_SECRET` | แจ้งเตือน LINE ของระบบ IoT |
+| `NEXT_PUBLIC_SITE_URL`, `CRON_SECRET` | ลิงก์ในข้อความแจ้งเตือน และ cron ตรวจอุปกรณ์ออฟไลน์ |
+
+## เป้าหมายถัดไป
+
+ให้นักเรียน **หนึ่งห้อง** เข้ามาดูคะแนนตัวเองได้จริงก่อน แล้วค่อยตัดสินใจเรื่องอื่นจากปัญหาที่เจอจริง
+
+1. ตั้งค่า 3 ข้อข้างบนให้เสร็จ
+2. เข้าวิชา → แท็บ "นักเรียน" → อัปโหลด Excel (ต้องมี 2 คอลัมน์: **รหัสนักเรียน**, **ชื่อ-สกุล**)
+3. ให้นักเรียนลองกด "เข้าสู่ระบบด้วย Google" — ป้ายในแท็บนักเรียนจะเปลี่ยนเป็น "เข้าระบบแล้ว"
+4. กรอกคะแนนจริงสัก 1–2 ชิ้นงาน แล้วให้นักเรียนลองเข้าดู
+
+**หมายเหตุ:** ในฐานข้อมูลมีอุปกรณ์ทดสอบ "ห้องเซิร์ฟเวอร์ (ข้อมูลทดสอบ)" พร้อมข้อมูลจำลอง
+อยู่ในหน้า `/dashboard/iot` ลบทิ้งได้เมื่อไม่ต้องการแล้ว
 
 ## ระบบติดตามอุณหภูมิและความชื้น (ESP32 + DHT11)
 
