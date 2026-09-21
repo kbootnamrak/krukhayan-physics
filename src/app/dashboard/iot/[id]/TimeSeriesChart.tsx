@@ -262,8 +262,10 @@ export default function TimeSeriesChart({
 
           {/* ค่าล่าสุด ติดป้ายไว้ตลอด ไม่ต้องเอาเมาส์ไปชี้ */}
           <circle cx={scale.x(last.t)} cy={scale.yPos(last.v)} r={4} fill={color} stroke="#ffffff" strokeWidth={2} />
+          {/* ป้ายค่าล่าสุดต้องไม่ล้นเข้าไปในขอบขวา เพราะขอบขวาเป็นที่ของป้ายเส้นเกณฑ์
+              ถ้าค่าล่าสุดบังเอิญอยู่ใกล้เส้นเกณฑ์ ตัวหนังสือจะทับกันจนอ่านไม่ออก */}
           <text
-            x={Math.min(scale.x(last.t) + 8, W - PAD.right + 50)}
+            x={Math.min(scale.x(last.t) + 8, PAD.left + PLOT_W)}
             y={scale.yPos(last.v) - 10}
             textAnchor="end"
             fontSize={12}

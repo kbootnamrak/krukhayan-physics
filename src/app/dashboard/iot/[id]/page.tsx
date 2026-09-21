@@ -4,6 +4,7 @@ import Link from "next/link";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { AlertRule } from "@/lib/iot/types";
+import { csvFileName, readingsToCsv } from "@/lib/iot/csv";
 import TimeSeriesChart, { type Point } from "./TimeSeriesChart";
 import ThresholdPanel from "./ThresholdPanel";
 import RecipientsPanel, { type Recipient } from "./RecipientsPanel";
@@ -15,6 +16,7 @@ import AlertsPanel, { type AlertRow } from "./AlertsPanel";
  */
 const TEMP_COLOR = "#eb6834";
 const HUMID_COLOR = "#2a78d6";
+const RSSI_COLOR = "#1baf7a";
 
 const RANGES = [
   { key: "1h", label: "1 ชม.", hours: 1 },
@@ -39,6 +41,8 @@ type Reading = {
   recorded_at: string;
   temperature_c: number | null;
   humidity_pct: number | null;
+  heat_index_c: number | null;
+  rssi: number | null;
 };
 
 type Tab = "chart" | "thresholds" | "alerts" | "recipients" | "device";
@@ -81,7 +85,7 @@ export default function IotDevicePage({ params }: { params: Promise<{ id: string
 
     const { data: rows } = await supabase
       .from("iot_readings")
-      .select("recorded_at, temperature_c, humidity_pct")
+      .select("recorded_at, temperature_c, humidity_pct, heat_index_c, rssi")
       .eq("device_id", deviceId)
       .gte("recorded_at", since)
       .order("recorded_at")
@@ -126,13 +130,28 @@ export default function IotDevicePage({ params }: { params: Promise<{ id: string
   const series = useMemo(() => {
     const temp: Point[] = [];
     const humid: Point[] = [];
+    const rssi: Point[] = [];
     for (const r of readings) {
       const t = new Date(r.recorded_at).getTime();
       if (r.temperature_c !== null) temp.push({ t, v: Number(r.temperature_c) });
       if (r.humidity_pct !== null) humid.push({ t, v: Number(r.humidity_pct) });
+      if (r.rssi !== null) rssi.push({ t, v: Number(r.rssi) });
     }
-    return { temp, humid };
+    return { temp, humid, rssi };
   }, [readings]);
+
+  // สร้างไฟล์ในเบราว์เซอร์เลย ไม่ต้องยิงกลับไปที่เซิร์ฟเวอร์ เพราะข้อมูลโหลดมาอยู่แล้ว
+  function downloadCsv() {
+    if (readings.length === 0) return;
+    const rangeLabel = RANGES.find((r) => r.key === range)?.label.replace(/\s/g, "") ?? range;
+    const blob = new Blob([readingsToCsv(readings)], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = csvFileName(device?.name ?? "อุปกรณ์", rangeLabel);
+    link.click();
+    URL.revokeObjectURL(url);
+  }
 
   const ruleFor = (metric: string) => rules.find((r) => r.metric === metric) ?? null;
   const tempRule = ruleFor("temperature_c");
@@ -210,7 +229,7 @@ export default function IotDevicePage({ params }: { params: Promise<{ id: string
 
         {tab === "chart" && (
           <div className="space-y-4">
-            <div className="flex gap-1">
+            <div className="flex gap-1 flex-wrap items-center">
               {RANGES.map((r) => (
                 <button
                   key={r.key}
@@ -224,6 +243,15 @@ export default function IotDevicePage({ params }: { params: Promise<{ id: string
                   {r.label}
                 </button>
               ))}
+
+              <button
+                onClick={downloadCsv}
+                disabled={readings.length === 0}
+                className="ml-auto text-xs px-3 py-1.5 rounded-full border border-slate-300 bg-white text-slate-600 hover:border-slate-500 disabled:opacity-40"
+                title="เปิดใน Excel ได้ทันที มีคอลัมน์เวลาที่ผ่านไปสำหรับพล็อตกราฟ"
+              >
+                ⬇ ดาวน์โหลด CSV ({readings.length} แถว)
+              </button>
             </div>
 
             <TimeSeriesChart
@@ -241,6 +269,14 @@ export default function IotDevicePage({ params }: { params: Promise<{ id: string
               data={series.humid}
               min={humidRule?.min_value ?? null}
               max={humidRule?.max_value ?? null}
+            />
+            <TimeSeriesChart
+              title="ความแรงสัญญาณ Wi-Fi"
+              unit="dBm"
+              color={RSSI_COLOR}
+              data={series.rssi}
+              min={null}
+              max={null}
             />
           </div>
         )}
