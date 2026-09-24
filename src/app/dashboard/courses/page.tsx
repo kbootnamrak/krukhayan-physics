@@ -30,7 +30,7 @@ export default async function CoursesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 px-6 py-10">
+    <div className="px-6 py-10">
       <div className="max-w-3xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold text-slate-800">รายวิชาของฉัน</h1>

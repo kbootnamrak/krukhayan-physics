@@ -104,7 +104,7 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
   }, [load]);
 
   if (loading) {
-    return <div className="min-h-screen bg-slate-50 px-6 py-10 text-sm text-slate-500">กำลังโหลด...</div>;
+    return <div className="px-6 py-10 text-sm text-slate-500">กำลังโหลด...</div>;
   }
 
   const myEnrollment = enrollments.find((e) => e.student_id === userId);
@@ -125,7 +125,7 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 px-6 py-10">
+    <div className="px-6 py-10">
       <div className="max-w-5xl mx-auto space-y-6">
         <h1 className="text-2xl font-semibold text-slate-800">{courseLabel}</h1>
 
