@@ -384,7 +384,7 @@ DHT11 อ่านพลาดเป็นครั้งคราว ค่า�
 โปรเจกต์ Supabase `krukhayan-physics` (ref `ypktjqtkryupmwioeojk`) ตอนนี้อยู่สถานะ **INACTIVE**
 ต้องกด Restore ใน Supabase Dashboard ก่อน แล้วจึงรัน SQL
 
-รันไฟล์ `supabase/migrations/20260916000000_iot_monitoring.sql` ได้ 2 ทาง
+รันไฟล์ `supabase/migrations/20260916084652_iot_monitoring.sql` ได้ 2 ทาง
 - Supabase Dashboard → SQL Editor → วางทั้งไฟล์ → Run
 - หรือ `supabase db push` ถ้าใช้ Supabase CLI
 

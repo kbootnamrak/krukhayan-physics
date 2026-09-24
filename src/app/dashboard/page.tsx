@@ -21,7 +21,7 @@ export default async function DashboardPage() {
   const isTeacher = profile?.role === "teacher";
 
   return (
-    <div className="min-h-screen bg-slate-50 px-6 py-10">
+    <div className="px-6 py-10">
       <div className="max-w-3xl mx-auto space-y-6">
         <div>
           <h1 className="text-2xl font-semibold text-slate-800">

@@ -95,7 +95,7 @@ export default function IotDevicesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 px-6 py-10">
+    <div className="px-6 py-10">
       <div className="max-w-4xl mx-auto space-y-6">
         <div>
           <Link href="/dashboard" className="text-sm text-slate-500 hover:underline">

@@ -1,0 +1,9 @@
+-- ไฟล์นี้ตั้งใจเว้นว่างไว้
+--
+-- migration ตัวจริงบน Supabase สร้างบัญชีครูคนแรกโดยตรงใน auth.users
+-- และมีรหัสผ่าน (แบบ hash) ฝังอยู่ในคำสั่ง จึงไม่นำมาเก็บใน repo
+-- ที่ยังคงไฟล์ชื่อนี้ไว้ก็เพื่อให้ลำดับ migration ใน repo ตรงกับประวัติบน Supabase
+--
+-- ถ้าต้องสร้างฐานข้อมูลใหม่ ให้สมัครบัญชีครูผ่านหน้าเว็บตามปกติ แล้วรันใน SQL Editor:
+--   update public.profiles set role = 'teacher'
+--   where id = (select id from auth.users where email = '<อีเมลครู>');

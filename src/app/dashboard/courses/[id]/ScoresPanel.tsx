@@ -1,15 +1,21 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { calcGrade, DEFAULT_GRADE_SCALE, type GradeScale } from "@/lib/grade";
+import { dbErrorMessage } from "@/lib/db-error";
+import { fmt, gradedItems, scoreLookup, summarize, type SourceType } from "@/lib/scores";
 
 type Category = "K" | "P" | "A";
 type Unit = { id: string; title: string; sort_order: number };
 type Component = { id: string; unit_id: string; category: Category; max_score: number };
 type Exam = { id: string; exam_type: "midterm" | "final"; max_score: number };
 type Enrollment = { id: string; student_id: string; profiles: { full_name: string; student_code: string | null } | null };
-type ScoreRow = { enrollment_id: string; source_type: "unit_component" | "exam"; source_id: string; score: number | null };
+export type ScoreRow = { enrollment_id: string; source_type: SourceType; source_id: string; score: number | null };
+
+type Column = { sourceType: SourceType; sourceId: string; max: number; label: string };
+
+const CATEGORY_ORDER: Category[] = ["K", "P", "A"];
 
 export default function ScoresPanel({
   units,
@@ -18,7 +24,7 @@ export default function ScoresPanel({
   enrollments,
   scores,
   gradeScales,
-  onChanged,
+  onScoreSaved,
 }: {
   units: Unit[];
   components: Component[];
@@ -26,140 +32,286 @@ export default function ScoresPanel({
   enrollments: Enrollment[];
   scores: ScoreRow[];
   gradeScales: GradeScale[];
-  onChanged: () => void;
+  onScoreSaved: (row: ScoreRow) => void;
 }) {
-  const supabase = createClient();
-  const [saving, setSaving] = useState<string | null>(null);
+  const [pending, setPending] = useState(0);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const sortedUnits = useMemo(() => [...units].sort((a, b) => a.sort_order - b.sort_order), [units]);
-  const maxTotal = useMemo(() => {
-    const compTotal = components.reduce((sum, c) => sum + c.max_score, 0);
-    const examTotal = exams.reduce((sum, e) => sum + e.max_score, 0);
-    return compTotal + examTotal;
-  }, [components, exams]);
+  // แสดงเฉพาะช่องที่ตั้งคะแนนเต็มไว้จริง — หน่วยที่ไม่มี A ก็ไม่ต้องมีคอลัมน์ A ว่าง ๆ
+  const groups = useMemo((): { title: string; columns: Column[] }[] => {
+    const sorted = [...units].sort((a, b) => a.sort_order - b.sort_order);
+    const unitGroups = sorted
+      .map((u) => ({
+        title: u.title,
+        columns: CATEGORY_ORDER.flatMap((cat): Column[] => {
+          const c = components.find((x) => x.unit_id === u.id && x.category === cat);
+          return c ? [{ sourceType: "unit_component", sourceId: c.id, max: Number(c.max_score), label: cat }] : [];
+        }),
+      }))
+      .filter((g) => g.columns.length > 0);
 
-  function getScore(enrollmentId: string, sourceType: ScoreRow["source_type"], sourceId: string) {
-    return scores.find(
-      (s) => s.enrollment_id === enrollmentId && s.source_type === sourceType && s.source_id === sourceId
-    )?.score ?? "";
-  }
+    const examColumns = (["midterm", "final"] as const).flatMap((t): Column[] => {
+      const e = exams.find((x) => x.exam_type === t);
+      return e
+        ? [{ sourceType: "exam", sourceId: e.id, max: Number(e.max_score), label: t === "midterm" ? "กลางภาค" : "ปลายภาค" }]
+        : [];
+    });
+    return examColumns.length > 0 ? [...unitGroups, { title: "สอบ", columns: examColumns }] : unitGroups;
+  }, [units, components, exams]);
 
-  async function saveScore(
-    enrollmentId: string,
-    sourceType: ScoreRow["source_type"],
-    sourceId: string,
-    value: string
-  ) {
-    const key = `${enrollmentId}-${sourceType}-${sourceId}`;
-    setSaving(key);
-    const score = value === "" ? null : Number(value);
-    await supabase
-      .from("student_scores")
-      .upsert(
-        { enrollment_id: enrollmentId, source_type: sourceType, source_id: sourceId, score },
-        { onConflict: "enrollment_id,source_type,source_id" }
-      );
-    setSaving(null);
-    onChanged();
-  }
+  const columns: Column[] = groups.flatMap((g) => g.columns);
+  // เส้นแบ่งแนวตั้งหน้าคอลัมน์แรกของแต่ละหน่วย ให้ดูออกว่าช่องไหนอยู่หน่วยไหน
+  const groupStart = (c: Column) => groups.some((g) => g.columns[0] === c);
+  const items = useMemo(() => gradedItems(components, exams), [components, exams]);
 
-  function totalFor(enrollmentId: string) {
-    let total = 0;
-    for (const c of components) {
-      total += Number(getScore(enrollmentId, "unit_component", c.id)) || 0;
-    }
-    for (const e of exams) {
-      total += Number(getScore(enrollmentId, "exam", e.id)) || 0;
-    }
-    return total;
-  }
+  const students = useMemo(
+    () =>
+      [...enrollments].sort((a, b) =>
+        (a.profiles?.student_code ?? "").localeCompare(b.profiles?.student_code ?? "", "th", { numeric: true }) ||
+        (a.profiles?.full_name ?? "").localeCompare(b.profiles?.full_name ?? "", "th")
+      ),
+    [enrollments]
+  );
+
+  const errorCount = Object.keys(errors).length;
+
+  // เตือนก่อนปิดแท็บถ้ายังบันทึกไม่เสร็จหรือมีช่องที่บันทึกไม่สำเร็จ
+  useEffect(() => {
+    if (pending === 0 && errorCount === 0) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [pending, errorCount]);
 
   const scales = gradeScales.length ? gradeScales : DEFAULT_GRADE_SCALE;
 
+  if (columns.length === 0) {
+    return (
+      <p className="bg-white border border-slate-200 rounded-lg p-4 text-sm text-slate-500">
+        ยังไม่ได้ตั้งคะแนนเต็มของวิชานี้ — ไปตั้งที่แท็บ &quot;หน่วยการเรียนรู้&quot; ก่อน
+      </p>
+    );
+  }
+
+  if (students.length === 0) {
+    return (
+      <p className="bg-white border border-slate-200 rounded-lg p-4 text-sm text-slate-500">
+        ยังไม่มีนักเรียนในวิชานี้ — นำเข้ารายชื่อที่แท็บ &quot;นักเรียน&quot; แล้วนักเรียนจะขึ้นที่นี่หลังเข้าระบบครั้งแรก
+      </p>
+    );
+  }
+
   return (
-    <div className="overflow-x-auto">
-      <table className="text-sm border-collapse w-full">
-        <thead>
-          <tr className="text-left text-slate-500">
-            <th className="p-2 sticky left-0 bg-slate-50 min-w-[160px]">นักเรียน</th>
-            {sortedUnits.map((u) => (
-              <th key={u.id} colSpan={3} className="p-2 text-center border-l border-slate-200">
-                {u.title}
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-4 flex-wrap text-xs">
+        <p className="text-slate-500">
+          กด <kbd className="px-1 border border-slate-300 rounded">Enter</kbd> เพื่อบันทึกแล้วลงไปคนถัดไป · ช่องว่าง = ยังไม่ได้ให้คะแนน (ไม่ใช่ 0)
+        </p>
+        <p className={pending > 0 ? "text-slate-500" : "text-green-700"} aria-live="polite">
+          {pending > 0 ? "กำลังบันทึก..." : "✓ บันทึกแล้วทั้งหมด"}
+        </p>
+      </div>
+
+      {errorCount > 0 && (
+        <div className="bg-red-50 border border-red-300 rounded-lg p-3 text-sm text-red-800" role="alert">
+          มี {errorCount} ช่องที่ยังบันทึกไม่สำเร็จ (ช่องสีแดง) — {Object.values(errors).at(-1)}
+        </div>
+      )}
+
+      <div className="overflow-x-auto bg-white border border-slate-200 rounded-lg">
+        <table className="text-sm border-collapse w-full">
+          <thead>
+            <tr className="text-left text-slate-500">
+              <th rowSpan={2} className="p-2 sticky left-0 bg-white min-w-[180px] align-bottom">
+                นักเรียน
               </th>
-            ))}
-            <th className="p-2 text-center border-l border-slate-200">กลางภาค</th>
-            <th className="p-2 text-center border-l border-slate-200">ปลายภาค</th>
-            <th className="p-2 text-center border-l border-slate-200">รวม</th>
-            <th className="p-2 text-center">เกรด</th>
-          </tr>
-          <tr className="text-left text-slate-400 text-xs">
-            <th className="p-1 sticky left-0 bg-slate-50"></th>
-            {sortedUnits.map((u) => (
-              <Fragment key={u.id}>
-                <th className="p-1 text-center border-l border-slate-200">K</th>
-                <th className="p-1 text-center">P</th>
-                <th className="p-1 text-center">A</th>
-              </Fragment>
-            ))}
-            <th className="border-l border-slate-200"></th>
-            <th className="border-l border-slate-200"></th>
-            <th className="border-l border-slate-200"></th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {enrollments.map((en) => {
-            const total = totalFor(en.id);
-            const percent = maxTotal > 0 ? (total / maxTotal) * 100 : 0;
-            return (
-              <tr key={en.id} className="border-t border-slate-100">
-                <td className="p-2 sticky left-0 bg-white">
-                  {en.profiles?.full_name}
-                  <span className="text-slate-400 ml-1 text-xs">{en.profiles?.student_code}</span>
-                </td>
-                {sortedUnits.map((u) => (
-                  <Fragment key={u.id}>
-                    {(["K", "P", "A"] as Category[]).map((cat) => {
-                      const comp = components.find((c) => c.unit_id === u.id && c.category === cat);
-                      if (!comp) return <td key={u.id + cat} className="p-1 border-l border-slate-100" />;
-                      return (
-                        <td key={u.id + cat} className="p-1 border-l border-slate-100">
-                          <input
-                            type="number"
-                            defaultValue={getScore(en.id, "unit_component", comp.id)}
-                            onBlur={(e) => saveScore(en.id, "unit_component", comp.id, e.target.value)}
-                            className="w-14 border border-slate-200 rounded px-1 py-0.5 text-sm"
-                          />
-                        </td>
-                      );
-                    })}
-                  </Fragment>
-                ))}
-                {(["midterm", "final"] as const).map((type) => {
-                  const exam = exams.find((e) => e.exam_type === type);
-                  return (
-                    <td key={type} className="p-1 border-l border-slate-100">
-                      {exam ? (
-                        <input
-                          type="number"
-                          defaultValue={getScore(en.id, "exam", exam.id)}
-                          onBlur={(e) => saveScore(en.id, "exam", exam.id, e.target.value)}
-                          className="w-16 border border-slate-200 rounded px-1 py-0.5 text-sm"
-                        />
-                      ) : null}
+              {groups.map((g) => (
+                <th key={g.title} colSpan={g.columns.length} className="p-2 text-center border-l border-slate-200 font-medium">
+                  {g.title}
+                </th>
+              ))}
+              <th rowSpan={2} className="p-2 text-center border-l border-slate-200 align-bottom">
+                รวม
+              </th>
+              <th rowSpan={2} className="p-2 text-center align-bottom">
+                เกรด
+              </th>
+            </tr>
+            <tr className="text-slate-400 text-xs">
+              {columns.map((c) => (
+                <th
+                  key={c.sourceId}
+                  className={`p-1 text-center font-normal ${groupStart(c) ? "border-l border-slate-200" : ""}`}
+                >
+                  {c.label}
+                  <span className="block text-slate-300">/{fmt(c.max)}</span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {students.map((en, row) => {
+              const lookup = scoreLookup(scores, en.id);
+              const summary = summarize(items, lookup);
+              return (
+                <tr key={en.id} className="border-t border-slate-100">
+                  <td className="p-2 sticky left-0 bg-white">
+                    {en.profiles?.full_name}
+                    <span className="text-slate-400 ml-1 text-xs">{en.profiles?.student_code}</span>
+                  </td>
+                  {columns.map((c, col) => (
+                    <td
+                      key={c.sourceId}
+                      className={`p-1 ${groupStart(c) ? "border-l border-slate-100" : ""}`}
+                    >
+                      <ScoreCell
+                        row={row}
+                        col={col}
+                        enrollmentId={en.id}
+                        column={c}
+                        initial={lookup(c.sourceType, c.sourceId)}
+                        onPending={(delta) => setPending((p) => p + delta)}
+                        onResult={(key, error, saved) => {
+                          setErrors((prev) => {
+                            const next = { ...prev };
+                            if (error) next[key] = `${en.profiles?.full_name ?? ""} ช่อง ${c.label}: ${error}`;
+                            else delete next[key];
+                            return next;
+                          });
+                          if (saved) onScoreSaved(saved);
+                        }}
+                      />
                     </td>
-                  );
-                })}
-                <td className="p-2 border-l border-slate-100 text-center font-medium">
-                  {total} / {maxTotal}
-                </td>
-                <td className="p-2 text-center font-medium">{calcGrade(percent, scales)}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      {saving && <p className="text-xs text-slate-400 mt-2">กำลังบันทึก...</p>}
+                  ))}
+                  <td className="p-2 border-l border-slate-100 text-center font-medium whitespace-nowrap">
+                    {fmt(summary.earned)} / {fmt(summary.maxAll)}
+                  </td>
+                  <td className="p-2 text-center font-medium whitespace-nowrap">
+                    {summary.complete ? (
+                      calcGrade(summary.percentFinal ?? 0, scales)
+                    ) : (
+                      <span className="text-xs font-normal text-slate-400" title="เกรดจะขึ้นเมื่อกรอกครบทุกช่อง">
+                        ขาด {summary.missing}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
+  );
+}
+
+/**
+ * ช่องกรอกคะแนนหนึ่งช่อง
+ *
+ * - ใช้ type="text" แทน "number" เพราะช่อง number เปลี่ยนค่าเองเวลาหมุนลูกกลิ้งเมาส์
+ *   ครูที่เลื่อนหน้าจอผ่านช่องที่เลือกอยู่จะทำคะแนนนักเรียนเปลี่ยนโดยไม่รู้ตัว
+ * - บันทึกเฉพาะเมื่อค่าเปลี่ยนจริง และบอกผลทุกครั้ง: เขียว = บันทึกแล้ว, แดง = ไม่สำเร็จ
+ * - บันทึกเสร็จแล้วอัปเดตเฉพาะแถวนี้ ไม่โหลดข้อมูลทั้งวิชาใหม่
+ */
+function ScoreCell({
+  row,
+  col,
+  enrollmentId,
+  column,
+  initial,
+  onPending,
+  onResult,
+}: {
+  row: number;
+  col: number;
+  enrollmentId: string;
+  column: Column;
+  initial: number | null;
+  onPending: (delta: number) => void;
+  onResult: (key: string, error: string | null, saved?: ScoreRow) => void;
+}) {
+  const supabase = createClient();
+  const lastSaved = useRef<number | null>(initial);
+  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [error, setError] = useState<string | null>(null);
+  const key = `${enrollmentId}:${column.sourceId}`;
+
+  function fail(message: string) {
+    setStatus("error");
+    setError(message);
+    onResult(key, message);
+  }
+
+  async function commit(input: HTMLInputElement) {
+    const text = input.value.trim();
+    const next = text === "" ? null : Number(text);
+
+    if (next !== null && !Number.isFinite(next)) return fail("ไม่ใช่ตัวเลข");
+    if (next !== null && next < 0) return fail("คะแนนติดลบไม่ได้");
+    if (next !== null && next > column.max) return fail(`เกินคะแนนเต็ม ${fmt(column.max)}`);
+
+    if (next === lastSaved.current) {
+      // ค่าเดิม — ถ้าเคยแดงเพราะพิมพ์ผิดแล้วแก้กลับ ก็ล้างสถานะแดงออก
+      if (status === "error") {
+        setStatus("idle");
+        setError(null);
+        onResult(key, null);
+      }
+      return;
+    }
+
+    setStatus("saving");
+    onPending(1);
+    const { data, error: saveError } = await supabase
+      .from("student_scores")
+      .upsert(
+        { enrollment_id: enrollmentId, source_type: column.sourceType, source_id: column.sourceId, score: next },
+        { onConflict: "enrollment_id,source_type,source_id" }
+      )
+      .select("enrollment_id, source_type, source_id, score")
+      .single();
+    onPending(-1);
+
+    if (saveError || !data) return fail(dbErrorMessage(saveError) || "บันทึกไม่สำเร็จ");
+
+    lastSaved.current = next;
+    setStatus("saved");
+    setError(null);
+    onResult(key, null, { ...(data as ScoreRow), score: data.score === null ? null : Number(data.score) });
+    setTimeout(() => setStatus((s) => (s === "saved" ? "idle" : s)), 1500);
+  }
+
+  const style =
+    status === "error"
+      ? "border-red-500 bg-red-50"
+      : status === "saved"
+        ? "border-green-600"
+        : status === "saving"
+          ? "border-slate-300 text-slate-400"
+          : "border-slate-200";
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      data-cell={`${row}-${col}`}
+      defaultValue={initial ?? ""}
+      aria-label={`คะแนน ${column.label} เต็ม ${fmt(column.max)}`}
+      aria-invalid={status === "error"}
+      title={error ?? undefined}
+      onBlur={(e) => commit(e.currentTarget)}
+      onKeyDown={(e) => {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        const target = document.querySelector<HTMLInputElement>(`[data-cell="${row + (e.shiftKey ? -1 : 1)}-${col}"]`);
+        if (target) {
+          target.focus(); // การย้ายโฟกัสทำให้ช่องนี้ blur และบันทึกเอง
+          target.select();
+        } else {
+          e.currentTarget.blur();
+        }
+      }}
+      className={`w-14 border rounded px-1 py-0.5 text-sm text-center ${style}`}
+    />
   );
 }
