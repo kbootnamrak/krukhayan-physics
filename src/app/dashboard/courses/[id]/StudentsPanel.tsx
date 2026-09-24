@@ -5,11 +5,15 @@ import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase/client";
 import { dbErrorMessage } from "@/lib/db-error";
 import { SCHOOL_EMAIL_DOMAIN } from "@/lib/school";
+import { parseRoster } from "@/lib/students/parse-roster";
+import { compareRoster, placeLabel } from "@/lib/students/order";
 
 export type RosterRow = {
   id: string;
   student_code: string;
   full_name: string;
+  classroom: string | null;
+  class_number: number | null;
   claimed_by: string | null;
   claimed_at: string | null;
 };
@@ -37,30 +41,31 @@ export default function StudentsPanel({
     setLog([]);
     setError(null);
     try {
-      let rows: Record<string, unknown>[];
+      let table: unknown[][];
       try {
         const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
-        rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[wb.SheetNames[0]]);
+        // raw: false = อ่านค่าตามที่เห็นใน Excel — รหัสที่จัดรูปแบบให้มีเลข 0 นำหน้าจะไม่หาย
+        table = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: "" });
       } catch {
         setError("เปิดไฟล์นี้ไม่ได้ — ต้องเป็นไฟล์ Excel (.xlsx หรือ .xls)");
         return;
       }
 
-      const payload = rows.map((r) => ({
-        student_code: String(r["รหัสนักเรียน"] ?? r["student_code"] ?? "").trim(),
-        full_name: String(r["ชื่อ-สกุล"] ?? r["full_name"] ?? "").trim(),
-      }));
-
-      // ไฟล์ที่หัวคอลัมน์ไม่ตรง จะได้ทุกแถวว่าง — บอกให้ชัดแทนการขึ้น "ข้าม" ทุกบรรทัด
-      if (payload.length === 0 || payload.every((r) => !r.student_code && !r.full_name)) {
-        setError('ไม่พบข้อมูล — แถวแรกของชีตแรกต้องมีหัวคอลัมน์ "รหัสนักเรียน" และ "ชื่อ-สกุล" สะกดตรงตามนี้');
+      const parsed = parseRoster(table);
+      if (!parsed.ok) {
+        setError(parsed.error);
+        return;
+      }
+      const skippedLines = parsed.skipped.map((s) => `${s.student_code} ${s.full_name} — ข้าม: ${s.reason}`);
+      if (parsed.rows.length === 0) {
+        setLog(["ไม่มีนักเรียนที่นำเข้าได้", ...skippedLines]);
         return;
       }
 
       const res = await fetch("/api/students/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ courseId, rows: payload }),
+        body: JSON.stringify({ courseId, rows: parsed.rows }),
       }).catch(() => null);
       const data = res ? await res.json().catch(() => null) : null;
 
@@ -73,9 +78,13 @@ export default function StudentsPanel({
       } else {
         const results = data.results as { student_code: string; status: string }[];
         const failed = results.filter((r) => /^ไม่สำเร็จ|^ข้าม/.test(r.status));
+        const imported = results.length - failed.length;
+        const notImported = failed.length + parsed.skipped.length;
+        // แสดงเฉพาะคนที่มีปัญหา — รายชื่อที่นำเข้าสำเร็จดูได้ในรายการด้านล่างอยู่แล้ว
         setLog([
-          `นำเข้า ${results.length - failed.length} จาก ${results.length} คน${failed.length ? ` — มีปัญหา ${failed.length} คน (ดูด้านล่าง)` : ""}`,
-          ...results.map((r) => `${r.student_code}: ${r.status}`),
+          `นำเข้าแล้ว ${imported} คน${notImported ? ` · ไม่ได้นำเข้า ${notImported} คน (ดูด้านล่าง)` : ""}`,
+          ...skippedLines,
+          ...failed.map((r) => `${r.student_code} — ${r.status}`),
         ]);
       }
       onChanged();
@@ -133,8 +142,19 @@ export default function StudentsPanel({
     <div className="space-y-4">
       <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-2">
         <p className="text-sm text-slate-600">
-          อัปโหลดไฟล์ Excel (.xlsx) คอลัมน์ที่ต้องมี: <b>รหัสนักเรียน</b> และ <b>ชื่อ-สกุล</b>
+          อัปโหลดไฟล์ Excel รายชื่อนักเรียนที่ส่งออกจากระบบทะเบียนได้เลย ไม่ต้องแก้ไฟล์
         </p>
+        <ul className="text-xs text-slate-500 list-disc pl-5 space-y-0.5">
+          <li>
+            ต้องมี <b>รหัสนักเรียน</b> และชื่อ — จะเป็น <b>คำนำหน้า / ชื่อ / นามสกุล</b> แยกคอลัมน์ หรือ <b>ชื่อ-สกุล</b> คอลัมน์เดียวก็ได้
+          </li>
+          <li>
+            ถ้ามี <b>ระดับชั้น / ห้อง / เลขที่</b> ระบบจะเรียงรายชื่อตามห้องและเลขที่ให้เหมือนสมุดคะแนน
+          </li>
+          <li>
+            ถ้ามี <b>สถานะนักเรียน</b> จะนำเข้าเฉพาะคนที่สถานะ &quot;เรียน&quot; (ลาออก ย้าย ฯลฯ จะถูกข้าม)
+          </li>
+        </ul>
         <p className="text-xs text-slate-500">
           ไม่ต้องใส่อีเมล — ระบบจับคู่จากรหัสนักเรียนกับบัญชี Google ของโรงเรียน
           (<code>รหัสนักเรียน@{SCHOOL_EMAIL_DOMAIN}</code>) ให้อัตโนมัติตอนนักเรียนเข้าระบบครั้งแรก
@@ -179,11 +199,14 @@ export default function StudentsPanel({
         {roster.length === 0 && (
           <p className="p-4 text-sm text-slate-400">ยังไม่มีรายชื่อนักเรียนในวิชานี้</p>
         )}
-        {roster.map((r) => (
+        {[...roster].sort(compareRoster).map((r) => (
           <div key={r.id} className="p-3 text-sm flex items-center justify-between gap-3">
-            <div>
+            <div className="min-w-0">
               <p className="text-slate-700">{r.full_name}</p>
-              <p className="text-xs text-slate-400">{r.student_code}</p>
+              <p className="text-xs text-slate-400">
+                {r.student_code}
+                {placeLabel(r) && <span> · {placeLabel(r)}</span>}
+              </p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
               <span

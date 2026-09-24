@@ -54,7 +54,7 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
       supabase.from("enrollments").select("id, student_id, profiles(full_name, student_code)").eq("course_id", courseId),
       supabase
         .from("class_roster")
-        .select("id, student_code, full_name, claimed_by, claimed_at")
+        .select("id, student_code, full_name, classroom, class_number, claimed_by, claimed_at")
         .eq("course_id", courseId)
         .order("student_code"),
       supabase.from("materials").select("id, title, link_url").eq("course_id", courseId).order("created_at"),
@@ -214,6 +214,13 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
             enrollments={enrollments}
             scores={scores}
             gradeScales={gradeScales}
+            placements={
+              new Map(
+                roster
+                  .filter((r) => r.claimed_by)
+                  .map((r) => [r.claimed_by!, { classroom: r.classroom, class_number: r.class_number }])
+              )
+            }
             exportName={`คะแนน ${course.code} ${course.name}${course.year ? ` ${course.year}-${course.semester}` : ""}`}
             onScoreSaved={saveScoreLocally}
           />

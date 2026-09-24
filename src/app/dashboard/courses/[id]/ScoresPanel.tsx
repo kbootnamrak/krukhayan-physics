@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { calcGrade, DEFAULT_GRADE_SCALE, type GradeScale } from "@/lib/grade";
 import { dbErrorMessage } from "@/lib/db-error";
 import { downloadBlob } from "@/lib/download";
+import { compareRoster, placeLabel } from "@/lib/students/order";
 import { fmt, gradedItems, scoreLookup, summarize, type SourceType } from "@/lib/scores";
 
 type Category = "K" | "P" | "A";
@@ -25,6 +26,7 @@ export default function ScoresPanel({
   enrollments,
   scores,
   gradeScales,
+  placements,
   exportName,
   onScoreSaved,
 }: {
@@ -34,6 +36,8 @@ export default function ScoresPanel({
   enrollments: Enrollment[];
   scores: ScoreRow[];
   gradeScales: GradeScale[];
+  /** ห้องและเลขที่ของนักเรียนแต่ละคน (key = student_id) */
+  placements: Map<string, { classroom: string | null; class_number: number | null }>;
   /** ชื่อไฟล์ Excel ที่ดาวน์โหลด (ไม่ต้องมี .xlsx) */
   exportName: string;
   onScoreSaved: (row: ScoreRow) => void;
@@ -69,14 +73,19 @@ export default function ScoresPanel({
   const groupStart = (c: Column) => groups.some((g) => g.columns[0] === c);
   const items = useMemo(() => gradedItems(components, exams), [components, exams]);
 
-  const students = useMemo(
-    () =>
-      [...enrollments].sort((a, b) =>
-        (a.profiles?.student_code ?? "").localeCompare(b.profiles?.student_code ?? "", "th", { numeric: true }) ||
-        (a.profiles?.full_name ?? "").localeCompare(b.profiles?.full_name ?? "", "th")
-      ),
-    [enrollments]
-  );
+  // เรียงแบบสมุดคะแนน: ห้อง → เลขที่ → รหัส (ห้อง/เลขที่มาจากไฟล์ที่นำเข้า)
+  const students = enrollments
+    .map((en) => {
+      const place = placements.get(en.student_id);
+      return {
+        ...en,
+        classroom: place?.classroom ?? null,
+        class_number: place?.class_number ?? null,
+        student_code: en.profiles?.student_code ?? null,
+      };
+    })
+    .sort(compareRoster);
+  const hasPlacement = students.some((s) => s.classroom !== null || s.class_number !== null);
 
   const errorCount = Object.keys(errors).length;
 
@@ -99,7 +108,10 @@ export default function ScoresPanel({
     try {
       // โหลดไลบรารีเฉพาะตอนกด — ไฟล์ใหญ่ ไม่ควรให้ทุกคนที่เปิดหน้านี้ต้องโหลด
       const XLSX = await import("xlsx");
+      // ห้อง/เลขที่ไว้หน้าสุดแบบสมุดคะแนน — ใส่เฉพาะเมื่อไฟล์ที่นำเข้ามีข้อมูลนี้
+      const placeHeader = hasPlacement ? ["ห้อง", "เลขที่"] : [];
       const header = [
+        ...placeHeader,
         "รหัสนักเรียน",
         "ชื่อ-สกุล",
         ...groups.flatMap((g) =>
@@ -114,6 +126,7 @@ export default function ScoresPanel({
         const lookup = scoreLookup(scores, en.id);
         const summary = summarize(items, lookup);
         return [
+          ...(hasPlacement ? [en.classroom ?? "", en.class_number ?? ""] : []),
           en.profiles?.student_code ?? "",
           en.profiles?.full_name ?? "",
           ...columns.map((c) => lookup(c.sourceType, c.sourceId) ?? ""),
@@ -125,7 +138,8 @@ export default function ScoresPanel({
       });
 
       const sheet = XLSX.utils.aoa_to_sheet([header, ...rows]);
-      sheet["!cols"] = header.map((h, i) => ({ wch: i === 1 ? 28 : Math.max(8, Math.min(24, h.length + 2)) }));
+      const nameColumn = placeHeader.length + 1;
+      sheet["!cols"] = header.map((h, i) => ({ wch: i === nameColumn ? 28 : Math.max(6, Math.min(24, h.length + 2)) }));
       const book = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(book, sheet, "คะแนน");
       const data = XLSX.write(book, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
@@ -221,6 +235,7 @@ export default function ScoresPanel({
                   <td className="p-2 sticky left-0 bg-white">
                     {en.profiles?.full_name}
                     <span className="text-slate-400 ml-1 text-xs">{en.profiles?.student_code}</span>
+                    {placeLabel(en) && <span className="block text-slate-400 text-xs">{placeLabel(en)}</span>}
                   </td>
                   {columns.map((c, col) => (
                     <td
