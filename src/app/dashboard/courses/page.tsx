@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import Breadcrumbs from "../Breadcrumbs";
 
 export default async function CoursesPage() {
   const supabase = await createClient();
@@ -32,6 +33,7 @@ export default async function CoursesPage() {
   return (
     <div className="px-6 py-10">
       <div className="max-w-3xl mx-auto space-y-6">
+        <Breadcrumbs items={[{ label: "หน้าหลัก", href: "/dashboard" }, { label: "รายวิชาของฉัน" }]} />
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold text-slate-800">รายวิชาของฉัน</h1>
           {isTeacher && (

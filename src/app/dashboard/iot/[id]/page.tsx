@@ -5,6 +5,7 @@ import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { AlertRule } from "@/lib/iot/types";
 import { csvFileName, readingsToCsv } from "@/lib/iot/csv";
+import { downloadBlob } from "@/lib/download";
 import TimeSeriesChart, { type Point } from "./TimeSeriesChart";
 import ThresholdPanel from "./ThresholdPanel";
 import RecipientsPanel, { type Recipient } from "./RecipientsPanel";
@@ -145,12 +146,7 @@ export default function IotDevicePage({ params }: { params: Promise<{ id: string
     if (readings.length === 0) return;
     const rangeLabel = RANGES.find((r) => r.key === range)?.label.replace(/\s/g, "") ?? range;
     const blob = new Blob([readingsToCsv(readings)], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = csvFileName(device?.name ?? "อุปกรณ์", rangeLabel);
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, csvFileName(device?.name ?? "อุปกรณ์", rangeLabel));
   }
 
   const ruleFor = (metric: string) => rules.find((r) => r.metric === metric) ?? null;
