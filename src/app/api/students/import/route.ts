@@ -4,7 +4,7 @@ import { adminClient } from "@/lib/supabase/admin";
 import { SCHOOL_EMAIL_DOMAIN } from "@/lib/school";
 import { dbErrorMessage } from "@/lib/db-error";
 
-type Row = { student_code: string; full_name: string };
+type Row = { student_code: string; full_name: string; classroom?: string | null; class_number?: number | null };
 
 /**
  * นำเข้ารายชื่อนักเรียนจาก Excel
@@ -32,6 +32,11 @@ export async function POST(request: Request) {
   for (const row of rows) {
     const studentCode = String(row.student_code ?? "").trim();
     const fullName = String(row.full_name ?? "").trim();
+    const classroom = typeof row.classroom === "string" && row.classroom.trim() ? row.classroom.trim() : null;
+    const classNumber =
+      typeof row.class_number === "number" && Number.isInteger(row.class_number) && row.class_number > 0
+        ? row.class_number
+        : null;
 
     if (!studentCode || !fullName) {
       results.push({ student_code: studentCode || "(ไม่ระบุ)", status: "ข้าม: ข้อมูลไม่ครบ" });
@@ -41,7 +46,7 @@ export async function POST(request: Request) {
     const { data: roster, error: rosterError } = await admin
       .from("class_roster")
       .upsert(
-        { course_id: courseId, student_code: studentCode, full_name: fullName },
+        { course_id: courseId, student_code: studentCode, full_name: fullName, classroom, class_number: classNumber },
         { onConflict: "course_id,student_code" }
       )
       .select("id, claimed_by")
