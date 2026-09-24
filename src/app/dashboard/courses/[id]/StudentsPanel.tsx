@@ -95,43 +95,27 @@ export default function StudentsPanel({
   }
 
   /**
-   * เอานักเรียนออกจากวิชา — ลบทั้งรายชื่อที่นำเข้าและการลงทะเบียน
-   * ถ้าลบแค่การลงทะเบียน นักเรียนจะถูกจับคู่กลับเข้ามาใหม่เองตอนล็อกอินครั้งถัดไป
+   * เอานักเรียนออกจากวิชา — ลบแถวรายชื่อ แล้วฐานข้อมูลลบการลงทะเบียนและคะแนนตามให้ (cascade ผ่าน roster_id)
+   * ต้องลบรายชื่อด้วย ถ้าลบแค่การลงทะเบียน นักเรียนจะถูกจับคู่กลับเข้ามาเองตอนล็อกอินครั้งถัดไป
    */
   async function removeStudent(r: RosterRow) {
     setError(null);
-    let enrollmentId: string | null = null;
     let scoreCount = 0;
 
-    if (r.claimed_by) {
-      const { data: enrollment } = await supabase
-        .from("enrollments")
-        .select("id")
-        .eq("course_id", courseId)
-        .eq("student_id", r.claimed_by)
-        .maybeSingle();
-      enrollmentId = enrollment?.id ?? null;
-      if (enrollmentId) {
-        const { count } = await supabase
-          .from("student_scores")
-          .select("id", { count: "exact", head: true })
-          .eq("enrollment_id", enrollmentId)
-          .not("score", "is", null);
-        scoreCount = count ?? 0;
-      }
+    const { data: enrollment } = await supabase.from("enrollments").select("id").eq("roster_id", r.id).maybeSingle();
+    if (enrollment) {
+      const { count } = await supabase
+        .from("student_scores")
+        .select("id", { count: "exact", head: true })
+        .eq("enrollment_id", enrollment.id)
+        .not("score", "is", null);
+      scoreCount = count ?? 0;
     }
 
     const warning = scoreCount ? `\n\nคะแนนที่กรอกไว้แล้ว ${scoreCount} ช่องจะถูกลบไปด้วย และกู้คืนไม่ได้` : "";
     if (!window.confirm(`เอา ${r.full_name} (${r.student_code}) ออกจากวิชานี้?${warning}`)) return;
 
     setBusy(true);
-    if (enrollmentId) {
-      const { error: enrollError } = await supabase.from("enrollments").delete().eq("id", enrollmentId);
-      if (enrollError) {
-        setBusy(false);
-        return setError(dbErrorMessage(enrollError));
-      }
-    }
     const { error: rosterError } = await supabase.from("class_roster").delete().eq("id", r.id);
     setBusy(false);
     if (rosterError) return setError(dbErrorMessage(rosterError));

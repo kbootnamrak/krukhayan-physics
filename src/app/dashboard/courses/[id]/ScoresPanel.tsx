@@ -12,7 +12,16 @@ type Category = "K" | "P" | "A";
 type Unit = { id: string; title: string; sort_order: number };
 type Component = { id: string; unit_id: string; category: Category; max_score: number };
 type Exam = { id: string; exam_type: "midterm" | "final"; max_score: number };
-type Enrollment = { id: string; student_id: string; profiles: { full_name: string; student_code: string | null } | null };
+/**
+ * การลงทะเบียน 1 แถว = นักเรียน 1 คนในวิชา
+ * student_id ว่างได้ — นักเรียนที่ครูนำเข้าแล้วแต่ยังไม่เคยล็อกอิน (ครูกรอกคะแนนได้ตั้งแต่ตอนนั้น)
+ */
+export type Enrollment = {
+  id: string;
+  student_id: string | null;
+  class_roster: { full_name: string; student_code: string; classroom: string | null; class_number: number | null } | null;
+  profiles: { full_name: string; student_code: string | null } | null;
+};
 export type ScoreRow = { enrollment_id: string; source_type: SourceType; source_id: string; score: number | null };
 
 type Column = { sourceType: SourceType; sourceId: string; max: number; label: string };
@@ -26,7 +35,6 @@ export default function ScoresPanel({
   enrollments,
   scores,
   gradeScales,
-  placements,
   exportName,
   onScoreSaved,
 }: {
@@ -36,8 +44,6 @@ export default function ScoresPanel({
   enrollments: Enrollment[];
   scores: ScoreRow[];
   gradeScales: GradeScale[];
-  /** ห้องและเลขที่ของนักเรียนแต่ละคน (key = student_id) */
-  placements: Map<string, { classroom: string | null; class_number: number | null }>;
   /** ชื่อไฟล์ Excel ที่ดาวน์โหลด (ไม่ต้องมี .xlsx) */
   exportName: string;
   onScoreSaved: (row: ScoreRow) => void;
@@ -73,17 +79,17 @@ export default function ScoresPanel({
   const groupStart = (c: Column) => groups.some((g) => g.columns[0] === c);
   const items = useMemo(() => gradedItems(components, exams), [components, exams]);
 
-  // เรียงแบบสมุดคะแนน: ห้อง → เลขที่ → รหัส (ห้อง/เลขที่มาจากไฟล์ที่นำเข้า)
+  // ชื่อจากรายชื่อที่ครูนำเข้าก่อน (ตรงกับทะเบียนโรงเรียน) ถ้าไม่มีค่อยใช้ชื่อในโปรไฟล์
+  // เรียงแบบสมุดคะแนน: ห้อง → เลขที่ → รหัส
   const students = enrollments
-    .map((en) => {
-      const place = placements.get(en.student_id);
-      return {
-        ...en,
-        classroom: place?.classroom ?? null,
-        class_number: place?.class_number ?? null,
-        student_code: en.profiles?.student_code ?? null,
-      };
-    })
+    .map((en) => ({
+      id: en.id,
+      full_name: en.class_roster?.full_name ?? en.profiles?.full_name ?? "(ไม่มีชื่อ)",
+      student_code: en.class_roster?.student_code ?? en.profiles?.student_code ?? null,
+      classroom: en.class_roster?.classroom ?? null,
+      class_number: en.class_roster?.class_number ?? null,
+      signedIn: en.student_id !== null,
+    }))
     .sort(compareRoster);
   const hasPlacement = students.some((s) => s.classroom !== null || s.class_number !== null);
 
@@ -127,8 +133,8 @@ export default function ScoresPanel({
         const summary = summarize(items, lookup);
         return [
           ...(hasPlacement ? [en.classroom ?? "", en.class_number ?? ""] : []),
-          en.profiles?.student_code ?? "",
-          en.profiles?.full_name ?? "",
+          en.student_code ?? "",
+          en.full_name,
           ...columns.map((c) => lookup(c.sourceType, c.sourceId) ?? ""),
           Math.round(summary.earned * 100) / 100,
           summary.percentFinal === null ? "" : Math.round(summary.percentFinal * 100) / 100,
@@ -163,7 +169,7 @@ export default function ScoresPanel({
   if (students.length === 0) {
     return (
       <p className="bg-white border border-slate-200 rounded-lg p-4 text-sm text-slate-500">
-        ยังไม่มีนักเรียนในวิชานี้ — นำเข้ารายชื่อที่แท็บ &quot;นักเรียน&quot; แล้วนักเรียนจะขึ้นที่นี่หลังเข้าระบบครั้งแรก
+        ยังไม่มีนักเรียนในวิชานี้ — นำเข้ารายชื่อที่แท็บ &quot;นักเรียน&quot; แล้วกรอกคะแนนที่นี่ได้ทันที
       </p>
     );
   }
@@ -233,8 +239,13 @@ export default function ScoresPanel({
               return (
                 <tr key={en.id} className="border-t border-slate-100">
                   <td className="p-2 sticky left-0 bg-white">
-                    {en.profiles?.full_name}
-                    <span className="text-slate-400 ml-1 text-xs">{en.profiles?.student_code}</span>
+                    {en.full_name}
+                    <span className="text-slate-400 ml-1 text-xs">{en.student_code}</span>
+                    {!en.signedIn && (
+                      <span className="ml-1 text-slate-300 text-xs" title="ยังไม่เคยเข้าระบบ — กรอกคะแนนได้ นักเรียนจะเห็นหลังเข้าระบบ">
+                        ○
+                      </span>
+                    )}
                     {placeLabel(en) && <span className="block text-slate-400 text-xs">{placeLabel(en)}</span>}
                   </td>
                   {columns.map((c, col) => (
@@ -252,7 +263,7 @@ export default function ScoresPanel({
                         onResult={(key, error, saved) => {
                           setErrors((prev) => {
                             const next = { ...prev };
-                            if (error) next[key] = `${en.profiles?.full_name ?? ""} ช่อง ${c.label}: ${error}`;
+                            if (error) next[key] = `${en.full_name} ช่อง ${c.label}: ${error}`;
                             else delete next[key];
                             return next;
                           });
