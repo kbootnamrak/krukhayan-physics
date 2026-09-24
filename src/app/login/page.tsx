@@ -5,6 +5,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { SCHOOL_EMAIL_DOMAIN } from "@/lib/school";
+import { authErrorMessage } from "@/lib/auth-error";
 import AuthHashNotice from "@/app/AuthHashNotice";
 
 const AUTH_ERRORS: Record<string, string> = {
@@ -42,7 +43,7 @@ function LoginForm() {
     });
     if (error) {
       setLoading(false);
-      setError(error.message);
+      setError(authErrorMessage(error));
     }
   }
 
@@ -54,7 +55,7 @@ function LoginForm() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (error) {
-      setError(error.message);
+      setError(authErrorMessage(error));
       return;
     }
     router.push("/dashboard");

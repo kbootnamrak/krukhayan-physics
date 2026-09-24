@@ -33,6 +33,9 @@ export default function UnitsPanel({
   const [newMax, setNewMax] = useState<Record<Category, string>>({ K: "10", P: "10", A: "10" });
   const [addError, setAddError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [renaming, setRenaming] = useState<{ id: string; title: string } | null>(null);
+  const [unitBusy, setUnitBusy] = useState(false);
+  const [unitError, setUnitError] = useState<string | null>(null);
 
   function compFor(unitId: string, category: Category) {
     return components.find((c) => c.unit_id === unitId && c.category === category);
@@ -114,7 +117,7 @@ export default function UnitsPanel({
     setAdding(true);
     const { data: unit, error } = await supabase
       .from("course_units")
-      .insert({ course_id: courseId, title: title.trim(), sort_order: units.length })
+      .insert({ course_id: courseId, title: title.trim(), sort_order: Math.max(-1, ...units.map((u) => u.sort_order)) + 1 })
       .select("id")
       .single();
 
@@ -141,7 +144,67 @@ export default function UnitsPanel({
     onChanged();
   }
 
-  const missing = units
+  // ---------- แก้ชื่อ / เรียงลำดับ / ลบหน่วย ----------
+  const sortedUnits = [...units].sort((a, b) => a.sort_order - b.sort_order);
+
+  async function saveRename(e: React.FormEvent) {
+    e.preventDefault();
+    if (!renaming || !renaming.title.trim()) return;
+    setUnitBusy(true);
+    setUnitError(null);
+    const { error } = await supabase.from("course_units").update({ title: renaming.title.trim() }).eq("id", renaming.id);
+    setUnitBusy(false);
+    if (error) return setUnitError(dbErrorMessage(error));
+    setRenaming(null);
+    onChanged();
+  }
+
+  async function moveUnit(index: number, direction: -1 | 1) {
+    const order = [...sortedUnits];
+    const [moved] = order.splice(index, 1);
+    order.splice(index + direction, 0, moved);
+    // เขียนลำดับใหม่ทุกหน่วยเป็น 0,1,2,... — ค่าเดิมอาจซ้ำกันได้ ถ้าสลับแค่สองตัวลำดับอาจไม่เปลี่ยน
+    setUnitBusy(true);
+    setUnitError(null);
+    const results = await Promise.all(
+      order.map((u, i) =>
+        u.sort_order === i ? null : supabase.from("course_units").update({ sort_order: i }).eq("id", u.id)
+      )
+    );
+    setUnitBusy(false);
+    const failed = results.find((r) => r?.error);
+    if (failed?.error) setUnitError(dbErrorMessage(failed.error));
+    onChanged();
+  }
+
+  async function deleteUnit(unit: Unit) {
+    const compIds = components.filter((c) => c.unit_id === unit.id).map((c) => c.id);
+    setUnitBusy(true);
+    setUnitError(null);
+    const { count, error: countError } = compIds.length
+      ? await supabase
+          .from("student_scores")
+          .select("id", { count: "exact", head: true })
+          .eq("source_type", "unit_component")
+          .in("source_id", compIds)
+          .not("score", "is", null)
+      : { count: 0, error: null };
+    setUnitBusy(false);
+    if (countError) return setUnitError(dbErrorMessage(countError));
+
+    const warning = count
+      ? `\n\nคะแนนนักเรียนที่กรอกในหน่วยนี้แล้ว ${count} ช่อง จะถูกลบไปด้วย และกู้คืนไม่ได้`
+      : "";
+    if (!window.confirm(`ลบ "${unit.title}" ?${warning}`)) return;
+
+    setUnitBusy(true);
+    const { error } = await supabase.from("course_units").delete().eq("id", unit.id);
+    setUnitBusy(false);
+    if (error) return setUnitError(dbErrorMessage(error));
+    onChanged();
+  }
+
+  const missing = sortedUnits
     .map((u) => ({ unit: u, cats: CATEGORIES.filter((cat) => !compFor(u.id, cat)) }))
     .filter((m) => m.cats.length > 0);
   const missingExams = (["midterm", "final"] as const).filter((t) => !exams.some((e) => e.exam_type === t));
@@ -200,10 +263,61 @@ export default function UnitsPanel({
         </div>
       )}
 
+      {unitError && (
+        <p role="alert" className="text-sm text-red-800 bg-red-50 border border-red-300 rounded-md px-3 py-2">
+          {unitError}
+        </p>
+      )}
+
       <div className="space-y-3">
-        {units.map((u) => (
+        {sortedUnits.map((u, i) => (
           <div key={u.id} className="bg-white border border-slate-200 rounded-lg p-4">
-            <p className="font-medium text-slate-700 text-sm mb-2">{u.title}</p>
+            {renaming?.id === u.id ? (
+              <form onSubmit={saveRename} className="flex gap-2 flex-wrap mb-2">
+                <input
+                  value={renaming.title}
+                  onChange={(e) => setRenaming({ ...renaming, title: e.target.value })}
+                  aria-label="ชื่อหน่วย"
+                  className="flex-1 min-w-[200px] border border-slate-300 rounded-md px-3 py-1.5 text-sm"
+                  autoFocus
+                  required
+                />
+                <button disabled={unitBusy} className="bg-slate-800 text-white rounded-md px-3 py-1.5 text-sm disabled:opacity-50">
+                  บันทึก
+                </button>
+                <button type="button" onClick={() => setRenaming(null)} className="text-sm text-slate-500 hover:underline">
+                  ยกเลิก
+                </button>
+              </form>
+            ) : (
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <p className="font-medium text-slate-700 text-sm">{u.title}</p>
+                <div className="flex gap-3 shrink-0 text-sm">
+                  <button
+                    onClick={() => moveUnit(i, -1)}
+                    disabled={unitBusy || i === 0}
+                    aria-label={`เลื่อน ${u.title} ขึ้น`}
+                    className="text-slate-500 hover:text-slate-800 disabled:opacity-30"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    onClick={() => moveUnit(i, 1)}
+                    disabled={unitBusy || i === sortedUnits.length - 1}
+                    aria-label={`เลื่อน ${u.title} ลง`}
+                    className="text-slate-500 hover:text-slate-800 disabled:opacity-30"
+                  >
+                    ↓
+                  </button>
+                  <button onClick={() => setRenaming({ id: u.id, title: u.title })} className="text-slate-500 hover:text-slate-800 hover:underline">
+                    แก้ชื่อ
+                  </button>
+                  <button onClick={() => deleteUnit(u)} disabled={unitBusy} className="text-red-600 hover:text-red-800 hover:underline">
+                    ลบ
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="flex gap-4 flex-wrap">
               {CATEGORIES.map((cat) => (
                 <MaxInput

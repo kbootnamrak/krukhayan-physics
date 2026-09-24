@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { calcGrade, DEFAULT_GRADE_SCALE, type GradeScale } from "@/lib/grade";
 import { dbErrorMessage } from "@/lib/db-error";
+import { downloadBlob } from "@/lib/download";
 import { fmt, gradedItems, scoreLookup, summarize, type SourceType } from "@/lib/scores";
 
 type Category = "K" | "P" | "A";
@@ -24,6 +25,7 @@ export default function ScoresPanel({
   enrollments,
   scores,
   gradeScales,
+  exportName,
   onScoreSaved,
 }: {
   units: Unit[];
@@ -32,10 +34,13 @@ export default function ScoresPanel({
   enrollments: Enrollment[];
   scores: ScoreRow[];
   gradeScales: GradeScale[];
+  /** ชื่อไฟล์ Excel ที่ดาวน์โหลด (ไม่ต้องมี .xlsx) */
+  exportName: string;
   onScoreSaved: (row: ScoreRow) => void;
 }) {
   const [pending, setPending] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [exporting, setExporting] = useState(false);
 
   // แสดงเฉพาะช่องที่ตั้งคะแนนเต็มไว้จริง — หน่วยที่ไม่มี A ก็ไม่ต้องมีคอลัมน์ A ว่าง ๆ
   const groups = useMemo((): { title: string; columns: Column[] }[] => {
@@ -85,6 +90,54 @@ export default function ScoresPanel({
 
   const scales = gradeScales.length ? gradeScales : DEFAULT_GRADE_SCALE;
 
+  /**
+   * ส่งออกเป็น Excel สำหรับส่งฝ่ายวัดผลปลายเทอม — คอลัมน์ตรงกับตารางบนจอ
+   * ช่องที่ยังไม่ได้กรอกเว้นว่าง (ไม่ใส่ 0) และคนที่ยังไม่ครบไม่ใส่เกรด แต่บอกในหมายเหตุ
+   */
+  async function exportExcel() {
+    setExporting(true);
+    try {
+      // โหลดไลบรารีเฉพาะตอนกด — ไฟล์ใหญ่ ไม่ควรให้ทุกคนที่เปิดหน้านี้ต้องโหลด
+      const XLSX = await import("xlsx");
+      const header = [
+        "รหัสนักเรียน",
+        "ชื่อ-สกุล",
+        ...groups.flatMap((g) =>
+          g.columns.map((c) => (g.title === "สอบ" ? `${c.label} (${fmt(c.max)})` : `${g.title} ${c.label} (${fmt(c.max)})`))
+        ),
+        `รวม (${fmt(items.reduce((s, i) => s + i.max, 0))})`,
+        "ร้อยละ",
+        "เกรด",
+        "หมายเหตุ",
+      ];
+      const rows = students.map((en) => {
+        const lookup = scoreLookup(scores, en.id);
+        const summary = summarize(items, lookup);
+        return [
+          en.profiles?.student_code ?? "",
+          en.profiles?.full_name ?? "",
+          ...columns.map((c) => lookup(c.sourceType, c.sourceId) ?? ""),
+          Math.round(summary.earned * 100) / 100,
+          summary.percentFinal === null ? "" : Math.round(summary.percentFinal * 100) / 100,
+          summary.complete ? calcGrade(summary.percentFinal ?? 0, scales) : "",
+          summary.complete ? "" : `ยังไม่ครบ ขาด ${summary.missing} รายการ`,
+        ];
+      });
+
+      const sheet = XLSX.utils.aoa_to_sheet([header, ...rows]);
+      sheet["!cols"] = header.map((h, i) => ({ wch: i === 1 ? 28 : Math.max(8, Math.min(24, h.length + 2)) }));
+      const book = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(book, sheet, "คะแนน");
+      const data = XLSX.write(book, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+      downloadBlob(
+        new Blob([data], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
+        `${exportName}.xlsx`
+      );
+    } finally {
+      setExporting(false);
+    }
+  }
+
   if (columns.length === 0) {
     return (
       <p className="bg-white border border-slate-200 rounded-lg p-4 text-sm text-slate-500">
@@ -107,9 +160,19 @@ export default function ScoresPanel({
         <p className="text-slate-500">
           กด <kbd className="px-1 border border-slate-300 rounded">Enter</kbd> เพื่อบันทึกแล้วลงไปคนถัดไป · ช่องว่าง = ยังไม่ได้ให้คะแนน (ไม่ใช่ 0)
         </p>
-        <p className={pending > 0 ? "text-slate-500" : "text-green-700"} aria-live="polite">
-          {pending > 0 ? "กำลังบันทึก..." : "✓ บันทึกแล้วทั้งหมด"}
-        </p>
+        <div className="flex items-center gap-4">
+          <p className={pending > 0 ? "text-slate-500" : "text-green-700"} aria-live="polite">
+            {pending > 0 ? "กำลังบันทึก..." : "✓ บันทึกแล้วทั้งหมด"}
+          </p>
+          <button
+            onClick={exportExcel}
+            disabled={exporting || pending > 0}
+            title={pending > 0 ? "รอบันทึกให้เสร็จก่อน" : undefined}
+            className="text-sm border border-slate-300 rounded-md px-3 py-1.5 text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            {exporting ? "กำลังสร้างไฟล์..." : "ดาวน์โหลด Excel"}
+          </button>
+        </div>
       </div>
 
       {errorCount > 0 && (

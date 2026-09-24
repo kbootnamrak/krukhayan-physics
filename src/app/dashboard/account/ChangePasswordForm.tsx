@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { authErrorMessage } from "@/lib/auth-error";
 
 const MIN_LENGTH = 6;
 
@@ -49,7 +50,7 @@ export default function ChangePasswordForm({ email }: { email: string }) {
     setLoading(false);
 
     if (updateError) {
-      setError(updateError.message);
+      setError(authErrorMessage(updateError));
       return;
     }
 

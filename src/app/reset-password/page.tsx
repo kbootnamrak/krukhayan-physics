@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { authErrorMessage } from "@/lib/auth-error";
 
 const MIN_LENGTH = 6;
 
@@ -35,11 +36,7 @@ export default function ResetPasswordPage() {
 
     if (error) {
       // ไม่มี session แปลว่าเข้ามาหน้านี้โดยไม่ได้ผ่านลิงก์ในอีเมล หรือลิงก์หมดอายุไปแล้ว
-      setError(
-        error.message.toLowerCase().includes("session")
-          ? "ลิงก์ไม่ถูกต้องหรือหมดอายุแล้ว กรุณาขอลิงก์ใหม่อีกครั้ง"
-          : error.message
-      );
+      setError(authErrorMessage(error));
       return;
     }
 
