@@ -57,15 +57,22 @@ export async function POST(request: Request) {
       continue;
     }
 
+    // ลงทะเบียนเข้าวิชาทันทีตอนนำเข้า — ครูกรอกคะแนนได้เลยโดยไม่ต้องรอนักเรียนล็อกอิน
+    // (เดิมสร้างตอนนักเรียนล็อกอินครั้งแรก ทำให้ตารางกรอกคะแนนว่างจนกว่าทุกคนจะเข้าระบบ)
+    const enrollmentId = await ensureEnrollment(admin, courseId, roster.id, roster.claimed_by);
+    if (!enrollmentId) {
+      results.push({ student_code: studentCode, status: "ไม่สำเร็จ: ลงทะเบียนเข้าวิชาไม่ได้" });
+      continue;
+    }
+
     if (roster.claimed_by) {
-      // นำเข้าซ้ำเพื่อแก้ชื่อที่สะกดผิด — อัปเดตชื่อในโปรไฟล์ให้ทันที ตารางคะแนนจะได้ถูกต้องเลย
-      // ไม่ต้องรอให้นักเรียนล็อกอินใหม่
+      // นำเข้าซ้ำเพื่อแก้ชื่อที่สะกดผิด — อัปเดตชื่อในโปรไฟล์ให้ทันที ไม่ต้องรอให้นักเรียนล็อกอินใหม่
       await admin.from("profiles").update({ full_name: fullName }).eq("id", roster.claimed_by);
       results.push({ student_code: studentCode, status: "มีอยู่แล้ว (เข้าระบบแล้ว) — อัปเดตชื่อแล้ว" });
       continue;
     }
 
-    // ถ้านักเรียนคนนี้เคยล็อกอินไว้ก่อนที่ครูจะนำเข้ารายชื่อ ให้จับคู่ให้เลย
+    // ถ้านักเรียนคนนี้เคยล็อกอินไว้ก่อนที่ครูจะนำเข้ารายชื่อ ให้ผูกบัญชีให้เลย
     const { data: existing } = await admin
       .from("profiles")
       .select("id")
@@ -73,26 +80,54 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     if (!existing) {
-      results.push({ student_code: studentCode, status: "เพิ่มแล้ว — รอนักเรียนเข้าระบบ" });
+      results.push({ student_code: studentCode, status: "เพิ่มแล้ว — กรอกคะแนนได้เลย" });
       continue;
     }
 
-    await admin
-      .from("enrollments")
-      .upsert(
-        { course_id: courseId, student_id: existing.id },
-        { onConflict: "course_id,student_id", ignoreDuplicates: true }
-      );
-
+    await admin.from("enrollments").update({ student_id: existing.id }).eq("id", enrollmentId);
     await admin
       .from("class_roster")
       .update({ claimed_by: existing.id, claimed_at: new Date().toISOString() })
       .eq("id", roster.id);
-
     await admin.from("profiles").update({ full_name: fullName }).eq("id", existing.id);
 
-    results.push({ student_code: studentCode, status: "เพิ่มและลงทะเบียนให้แล้ว" });
+    results.push({ student_code: studentCode, status: "เพิ่มและผูกบัญชีให้แล้ว" });
   }
 
   return NextResponse.json({ results, domain: SCHOOL_EMAIL_DOMAIN });
+}
+
+/**
+ * การลงทะเบียน 1 แถวต่อรายชื่อ 1 คน — คืน id ของการลงทะเบียน หรือ null ถ้าสร้างไม่ได้
+ * นำเข้าซ้ำกี่ครั้งก็ไม่เกิดแถวซ้ำ เพราะหาจาก roster_id ก่อน
+ */
+async function ensureEnrollment(
+  admin: ReturnType<typeof adminClient>,
+  courseId: string,
+  rosterId: string,
+  studentId: string | null
+): Promise<string | null> {
+  const { data: found } = await admin.from("enrollments").select("id").eq("roster_id", rosterId).maybeSingle();
+  if (found) return found.id;
+
+  const { data: created, error } = await admin
+    .from("enrollments")
+    .insert({ course_id: courseId, roster_id: rosterId, student_id: studentId })
+    .select("id")
+    .single();
+  if (created) return created.id;
+
+  // นักเรียนที่ล็อกอินไว้ก่อนมีระบบนี้ มีการลงทะเบียนแบบเก่า (ไม่มี roster_id) อยู่แล้ว — ผูกเข้าแถวเดิม
+  // ไม่สร้างใหม่ เพราะคะแนนที่กรอกไว้ผูกอยู่กับแถวเดิม
+  if (error?.code === "23505" && studentId) {
+    const { data: linked } = await admin
+      .from("enrollments")
+      .update({ roster_id: rosterId })
+      .eq("course_id", courseId)
+      .eq("student_id", studentId)
+      .select("id")
+      .single();
+    return linked?.id ?? null;
+  }
+  return null;
 }

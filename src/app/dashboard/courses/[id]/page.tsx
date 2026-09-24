@@ -7,7 +7,7 @@ import { dbErrorMessage } from "@/lib/db-error";
 import { fmt, gradedItems, scoreLookup, summarize } from "@/lib/scores";
 import Breadcrumbs from "../../Breadcrumbs";
 import UnitsPanel from "./UnitsPanel";
-import ScoresPanel, { type ScoreRow } from "./ScoresPanel";
+import ScoresPanel, { type Enrollment, type ScoreRow } from "./ScoresPanel";
 import StudentsPanel, { type RosterRow } from "./StudentsPanel";
 import MaterialsPanel from "./MaterialsPanel";
 import GradeScalePanel from "./GradeScalePanel";
@@ -31,7 +31,7 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
   const [units, setUnits] = useState<{ id: string; title: string; sort_order: number }[]>([]);
   const [components, setComponents] = useState<{ id: string; unit_id: string; category: "K" | "P" | "A"; max_score: number }[]>([]);
   const [exams, setExams] = useState<{ id: string; exam_type: "midterm" | "final"; max_score: number }[]>([]);
-  const [enrollments, setEnrollments] = useState<{ id: string; student_id: string; profiles: { full_name: string; student_code: string | null } | null }[]>([]);
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [scores, setScores] = useState<ScoreRow[]>([]);
   const [materials, setMaterials] = useState<{ id: string; title: string; link_url: string | null }[]>([]);
   const [roster, setRoster] = useState<RosterRow[]>([]);
@@ -51,7 +51,11 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
       supabase.from("courses").select("id, subjects(code, name), terms(academic_year, semester)").eq("id", courseId).maybeSingle(),
       supabase.from("course_units").select("id, title, sort_order").eq("course_id", courseId).order("sort_order"),
       supabase.from("exams").select("id, exam_type, max_score").eq("course_id", courseId),
-      supabase.from("enrollments").select("id, student_id, profiles(full_name, student_code)").eq("course_id", courseId),
+      // ชื่อ/ห้อง/เลขที่มาจากรายชื่อที่ครูนำเข้า — นักเรียนที่ยังไม่ล็อกอินยังไม่มีโปรไฟล์
+      supabase
+        .from("enrollments")
+        .select("id, student_id, class_roster(full_name, student_code, classroom, class_number), profiles(full_name, student_code)")
+        .eq("course_id", courseId),
       supabase
         .from("class_roster")
         .select("id, student_code, full_name, classroom, class_number, claimed_by, claimed_at")
@@ -214,13 +218,6 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
             enrollments={enrollments}
             scores={scores}
             gradeScales={gradeScales}
-            placements={
-              new Map(
-                roster
-                  .filter((r) => r.claimed_by)
-                  .map((r) => [r.claimed_by!, { classroom: r.classroom, class_number: r.class_number }])
-              )
-            }
             exportName={`คะแนน ${course.code} ${course.name}${course.year ? ` ${course.year}-${course.semester}` : ""}`}
             onScoreSaved={saveScoreLocally}
           />

@@ -41,12 +41,25 @@ export async function linkStudentToRoster(
 
   let enrolled = 0;
   for (const row of rows) {
-    const { error } = await admin
+    // การลงทะเบียนถูกสร้างไว้แล้วตั้งแต่ครูนำเข้ารายชื่อ (ครูจึงกรอกคะแนนได้ก่อนนักเรียนล็อกอิน)
+    // ตรงนี้แค่ผูกบัญชีเข้ากับแถวนั้น — คะแนนที่ครูกรอกไว้ก่อนจะตามมาด้วย
+    const { data: existing } = await admin
       .from("enrollments")
-      .upsert(
-        { course_id: row.course_id, student_id: user.id },
-        { onConflict: "course_id,student_id", ignoreDuplicates: true }
-      );
+      .select("id, student_id")
+      .eq("roster_id", row.id)
+      .maybeSingle();
+
+    const { error } = existing
+      ? existing.student_id === user.id
+        ? { error: null }
+        : await admin.from("enrollments").update({ student_id: user.id }).eq("id", existing.id)
+      : // รายชื่อที่นำเข้าก่อนมีการผูก roster_id — สร้างการลงทะเบียนตอนนี้
+        await admin
+          .from("enrollments")
+          .upsert(
+            { course_id: row.course_id, student_id: user.id, roster_id: row.id },
+            { onConflict: "course_id,student_id", ignoreDuplicates: true }
+          );
     if (error) continue;
 
     await admin
