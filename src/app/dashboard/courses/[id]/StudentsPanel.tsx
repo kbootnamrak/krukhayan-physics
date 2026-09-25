@@ -42,7 +42,9 @@ export default function StudentsPanel({
 
   // PIN สำหรับนักเรียนที่เข้าอีเมลโรงเรียนไม่ได้
   const [pinRosterIds, setPinRosterIds] = useState<Set<string>>(new Set());
-  const [issued, setIssued] = useState<{ name: string; studentCode: string; pin: string } | null>(null);
+  // PIN ที่เพิ่งสร้าง แสดงใต้แถวของนักเรียนคนนั้น (เดิมแสดงบนสุดของรายชื่อ ครูที่เลื่อนลงมากดไม่เห็น)
+  const [issued, setIssued] = useState<{ rosterId: string; name: string; studentCode: string; pin: string } | null>(null);
+  const [pinError, setPinError] = useState<{ rosterId: string; message: string } | null>(null);
   const [pinBusy, setPinBusy] = useState<string | null>(null);
 
   const loadPins = useCallback(async () => {
@@ -60,7 +62,7 @@ export default function StudentsPanel({
     if (action === "issue" && pinRosterIds.has(r.id) && !window.confirm(`สร้าง PIN ใหม่ให้ ${r.full_name}?\nPIN เดิมจะใช้ไม่ได้ทันที`)) return;
     if (action === "revoke" && !window.confirm(`ยกเลิก PIN ของ ${r.full_name}?\nนักเรียนจะเข้าด้วย PIN ไม่ได้อีก (คะแนนยังอยู่ครบ)`)) return;
     setPinBusy(r.id);
-    setError(null);
+    setPinError(null);
     const res = await fetch("/api/students/pin", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -68,8 +70,8 @@ export default function StudentsPanel({
     });
     const json = await res.json().catch(() => null);
     setPinBusy(null);
-    if (!res.ok) return setError(json?.error ?? "ทำรายการไม่สำเร็จ ลองใหม่อีกครั้ง");
-    if (action === "issue") setIssued({ name: json.name, studentCode: json.studentCode, pin: json.pin });
+    if (!res.ok) return setPinError({ rosterId: r.id, message: json?.error ?? "ทำรายการไม่สำเร็จ ลองใหม่อีกครั้ง" });
+    if (action === "issue") setIssued({ rosterId: r.id, name: json.name, studentCode: json.studentCode, pin: json.pin });
     else setIssued(null);
     await loadPins();
     onChanged();
@@ -241,37 +243,13 @@ export default function StudentsPanel({
         </p>
       )}
 
-      {/* PIN ที่เพิ่งสร้าง — แสดงครั้งเดียว ระบบไม่เก็บตัว PIN ไว้ */}
-      {issued && (
-        <div role="status" className="rounded-sm border-2 border-porcelain bg-white p-4 space-y-2">
-          <p className="text-sm text-slate-600">
-            บอกนักเรียน <b className="text-slate-800">{issued.name}</b> ให้เข้าหน้าเข้าสู่ระบบ → &quot;เข้าด้วยรหัสนักเรียน + PIN&quot;
-          </p>
-          <div className="flex flex-wrap items-end gap-6">
-            <p>
-              <span className="block text-xs text-slate-500">รหัสนักเรียน</span>
-              <span className="font-num tnum text-2xl font-semibold text-slate-800">{issued.studentCode}</span>
-            </p>
-            <p>
-              <span className="block text-xs text-slate-500">PIN</span>
-              <span className="font-num tnum text-4xl font-bold tracking-[0.2em] text-slate-800 select-all">{issued.pin}</span>
-            </p>
-          </div>
-          <p className="text-xs text-amber-800">
-            จด PIN นี้ให้นักเรียนตอนนี้ — ปิดกล่องนี้แล้วดูซ้ำไม่ได้ (ถ้าลืม กดสร้าง PIN ใหม่ได้)
-          </p>
-          <button type="button" onClick={() => setIssued(null)} className="text-sm text-slate-600 underline underline-offset-2">
-            ปิด
-          </button>
-        </div>
-      )}
-
       <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100">
         {roster.length === 0 && (
           <p className="p-4 text-sm text-slate-400">ยังไม่มีรายชื่อนักเรียนในวิชานี้</p>
         )}
         {[...shown].sort(compareRoster).map((r) => (
-          <div key={r.id} className="p-3 text-sm flex items-center justify-between gap-3">
+          <div key={r.id}>
+          <div className="p-3 text-sm flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-slate-700">{r.full_name}</p>
               <p className="text-xs text-slate-400">
@@ -317,6 +295,38 @@ export default function StudentsPanel({
                 เอาออก
               </button>
             </div>
+          </div>
+          {pinError?.rosterId === r.id && (
+            <p role="alert" className="mx-3 mb-3 text-sm text-red-800 bg-red-50 border border-red-300 rounded-sm px-3 py-2">
+              {pinError.message}
+            </p>
+          )}
+          {/* PIN ที่เพิ่งสร้าง — แสดงครั้งเดียว ระบบไม่เก็บตัว PIN ไว้ */}
+          {issued?.rosterId === r.id && (
+            <div
+              role="status"
+              ref={(el) => el?.scrollIntoView({ block: "nearest", behavior: "smooth" })}
+              className="mx-3 mb-3 rounded-sm border-2 border-porcelain bg-white p-4 space-y-2"
+            >
+              <p className="text-sm text-slate-600">
+                บอก <b className="text-slate-800">{issued.name}</b> ให้เข้าหน้าเข้าสู่ระบบ → &quot;เข้าด้วยรหัสนักเรียน + PIN&quot;
+              </p>
+              <div className="flex flex-wrap items-end gap-6">
+                <p>
+                  <span className="block text-xs text-slate-500">รหัสนักเรียน</span>
+                  <span className="font-num tnum text-2xl font-semibold text-slate-800">{issued.studentCode}</span>
+                </p>
+                <p>
+                  <span className="block text-xs text-slate-500">PIN</span>
+                  <span className="font-num tnum text-4xl font-bold tracking-[0.2em] text-slate-800 select-all">{issued.pin}</span>
+                </p>
+              </div>
+              <p className="text-xs text-amber-800">จด PIN นี้ให้นักเรียนตอนนี้ — ปิดกล่องนี้แล้วดูซ้ำไม่ได้ (ถ้าลืม กด &quot;PIN ใหม่&quot; ได้)</p>
+              <button type="button" onClick={() => setIssued(null)} className="text-sm text-slate-600 underline underline-offset-2">
+                ปิด
+              </button>
+            </div>
+          )}
           </div>
         ))}
       </div>
