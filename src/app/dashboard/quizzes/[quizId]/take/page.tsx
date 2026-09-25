@@ -193,8 +193,8 @@ function Taking({ data, onFinished }: { data: TakePayload; onFinished: (result: 
   const submittedRef = useRef(false);
   // คำตอบที่กำลังบันทึกอยู่ — ตอนส่งต้องรอให้บันทึกเสร็จก่อน ไม่งั้นข้อสุดท้ายที่เพิ่งกดอาจไม่ถูกนับ
   const pendingSaves = useRef(new Set<Promise<unknown>>());
-  // กล่องยืนยันของเบราว์เซอร์ (confirm) ทำให้หน้าเสียโฟกัส — ไม่นับเป็นการออกจากหน้า
-  const confirming = useRef(false);
+  // หน้ายืนยันก่อนส่ง (ทำในหน้าเว็บเอง — กล่อง confirm ของเบราว์เซอร์ในแอป LINE/Facebook บางเครื่องไม่แสดง แล้วส่งทันที)
+  const [reviewing, setReviewing] = useState(false);
 
   const finish = useCallback(
     (result: SubmittedResult) => {
@@ -234,7 +234,7 @@ function Taking({ data, onFinished }: { data: TakePayload; onFinished: (result: 
   useEffect(() => {
     let awaySince: number | null = null;
     const away = () => {
-      if (submittedRef.current || confirming.current || awaySince !== null) return;
+      if (submittedRef.current || awaySince !== null) return;
       awaySince = Date.now();
     };
     const back = async () => {
@@ -291,14 +291,11 @@ function Taking({ data, onFinished }: { data: TakePayload; onFinished: (result: 
   const who = [data.student?.name, data.student?.code].filter(Boolean).join(" · ") || "KruKhayan Physics";
 
   function confirmSubmit() {
-    const blank = total - answered;
-    const msg = blank > 0 ? `ยังไม่ได้ตอบ ${blank} ข้อ\nส่งเลยไหม? ส่งแล้วแก้ไม่ได้` : "ส่งคำตอบเลยไหม? ส่งแล้วแก้ไม่ได้";
-    confirming.current = true;
-    const ok = window.confirm(msg);
-    // ให้เหตุการณ์ focus ที่ตามมาหลังปิดกล่องผ่านไปก่อน ค่อยกลับมานับตามปกติ
-    setTimeout(() => (confirming.current = false), 300);
-    if (ok) submit();
+    setReviewing(true);
+    window.scrollTo({ top: 0 });
   }
+  const unanswered = data.questions.map((qq, i) => ({ id: qq.id, n: i + 1 })).filter((x) => answers[x.id] === undefined);
+
 
   const block = (e: React.SyntheticEvent) => e.preventDefault();
 
@@ -341,6 +338,60 @@ function Taking({ data, onFinished }: { data: TakePayload; onFinished: (result: 
         </p>
       )}
 
+      {/* หน้ายืนยันก่อนส่ง */}
+      {reviewing && (
+        <section aria-label="ยืนยันการส่งคำตอบ" className="bg-white border-2 border-porcelain rounded-sm p-5 space-y-4">
+          <h2 className="font-display text-xl font-bold text-slate-800">ตรวจก่อนส่ง</h2>
+          <p className="text-slate-700">
+            ตอบแล้ว <span className="font-num tnum text-2xl font-bold text-slate-800">{answered}</span> จาก{" "}
+            <span className="font-num tnum font-semibold">{total}</span> ข้อ
+          </p>
+          {unanswered.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-amber-700">ยังไม่ได้ตอบ {unanswered.length} ข้อ — กดเลขข้อเพื่อกลับไปตอบ</p>
+              <div className="flex flex-wrap gap-1.5">
+                {unanswered.map((x) => (
+                  <button
+                    key={x.id}
+                    type="button"
+                    onClick={() => {
+                      setIndex(x.n - 1);
+                      setReviewing(false);
+                    }}
+                    className="font-num tnum h-9 min-w-9 px-2 rounded-sm border-2 border-amber-300 text-sm font-semibold text-amber-800"
+                  >
+                    {x.n}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-green-700">ตอบครบทุกข้อแล้ว</p>
+          )}
+          <p className="text-sm text-slate-600">ส่งแล้วแก้คำตอบไม่ได้</p>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              type="button"
+              onClick={() => setReviewing(false)}
+              disabled={submitting}
+              className="flex-1 rounded-sm border-2 border-slate-300 py-2.5 font-semibold text-slate-700 disabled:opacity-50"
+            >
+              กลับไปตรวจคำตอบ
+            </button>
+            <button
+              type="button"
+              onClick={submit}
+              disabled={submitting}
+              className="flex-1 rounded-sm py-2.5 font-semibold bg-[oklch(50%_0.24_345)] text-[oklch(100%_0_0)] hover:bg-[oklch(55%_0.25_345)] disabled:opacity-50"
+            >
+              {submitting ? "กำลังส่ง..." : "ยืนยันส่งคำตอบ"}
+            </button>
+          </div>
+        </section>
+      )}
+
+      {!reviewing && (
+      <>
       {/* ข้อปัจจุบัน */}
       {q && (
         <section aria-label={`ข้อ ${index + 1} จาก ${total}`} className="bg-white border border-slate-200 rounded-sm p-4 space-y-3">
@@ -445,6 +496,8 @@ function Taking({ data, onFinished }: { data: TakePayload; onFinished: (result: 
           {submitting ? "กำลังส่ง..." : `ส่งคำตอบ (ตอบแล้ว ${answered}/${total} ข้อ)`}
         </button>
       </nav>
+      </>
+      )}
     </div>
   );
 }
