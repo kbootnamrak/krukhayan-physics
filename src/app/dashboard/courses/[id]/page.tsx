@@ -173,9 +173,9 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
       <div className="max-w-5xl mx-auto space-y-6">
         <div className="space-y-2">
           <Breadcrumbs items={[{ label: "หน้าหลัก", href: "/dashboard" }, coursesCrumb, { label: course.name }]} />
-          {/* ชื่อวิชาเป็นป้ายสาย: กรอบสีกระเบื้อง ตัวอักษรแบบป้ายสถานี */}
+          {/* ชื่อวิชาเป็นป้ายชิป: กรอบสีกระเบื้อง ตัวอักษรหัวข้อทรงเหลี่ยม */}
           <h1 className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            <span className="rounded-md border-2 border-porcelain px-3 py-0.5 font-sign text-3xl font-semibold text-slate-800 leading-tight">
+            <span className="rounded-sm border-2 border-porcelain px-3 py-0.5 font-display text-3xl font-semibold text-slate-800 leading-tight">
               {course.name}
             </span>
             {termText && <span className="text-base font-normal text-slate-500">{termText}</span>}
@@ -200,7 +200,7 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
                 onClick={() => setTab(t.key)}
                 className={`-mb-px border-b-[3px] px-4 py-2.5 text-sm whitespace-nowrap ${
                   activeTab === t.key
-                    ? "border-line-scarlet text-slate-800 font-medium"
+                    ? "border-trace-magenta text-slate-800 font-medium"
                     : "border-transparent text-slate-500 hover:text-slate-700"
                 }`}
               >

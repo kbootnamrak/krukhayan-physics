@@ -7,19 +7,19 @@ related_targets: []
 
 # Surface: หน้าคะแนนของนักเรียน (แท็บ "คะแนนของฉัน" ใน /dashboard/courses/[id])
 
-Mode: Operate. Audience: นักเรียน ม.ปลาย ส่วนใหญ่บนมือถือ ตอนเย็นหรือระหว่างคาบ. Job: รู้ว่าขาดงานชิ้นไหน, ได้กี่คะแนนแล้ว, ต้องได้อีกเท่าไรถึงเกรดที่ตั้งเป้า. Constraints: ตัวเลขคะแนนต้องอ่านชัดกว่าเดิม, หน้ากรอกคะแนนของครูต้องไม่ช้าลง, เกรดจริงแสดงเมื่อครบเท่านั้น. Pinned by the teacher: dark enamel ground with neon light (from their design.md), dark default with a light toggle.
+Mode: Operate. Audience: นักเรียน ม.ปลาย ส่วนใหญ่บนมือถือ ตอนเย็นหรือระหว่างคาบ. Job: รู้ว่าขาดงานชิ้นไหน, ได้กี่คะแนนแล้ว, ต้องได้อีกเท่าไรถึงเกรดที่ตั้งเป้า. Constraints: ตัวเลขคะแนนต้องอ่านชัดกว่าเดิม, หน้ากรอกคะแนนของครูต้องไม่ช้าลง, เกรดจริงแสดงเมื่อครบเท่านั้น. Pinned by the teacher: physics + cyberpunk, circuit-board form, intense on first-view pages and light on working pages; dark default with a light toggle.
 
 ## Direction contract
 
-THESIS: The term is a rail line the student rides. Every graded piece is a station; the ride ends at the grade they are aiming for. Refuses the category default of summary cards, percentage rings and progress bars.
+THESIS: The term is a circuit the student powers up. Each unit is a copper trace in its own neon ink, every graded piece is a soldered pad, and the circuit closes at the grade they are aiming for. Refuses summary cards, percentage rings and progress bars.
 
-OWN-WORLD: Midnight enamel ground, porcelain ink, four line inks (scarlet, cobalt, amber, green) assigned to units in order, the student's route lit brightest with a soft neon bleed. Stations are filled discs when graded and hollow porcelain rings when not, always paired with words. Exams are interchange rings. Labels are a condensed transit sans with tabular figures; Thai rides a humanist Thai sans. Lines bend only at 45 and 90 degrees. No glass, no blur, no gradients.
+OWN-WORLD: Night-navy PCB ground with a faint copper-trace pattern, porcelain ink, four neon trace inks (magenta, cyan, yellow, lime) assigned to units in order and shared with the teacher's score table. Scored pieces are filled solder pads with a drill hole and a soft neon bleed; unscored are empty porcelain rings with words; exams are IC-chip squares; unit changes are vias. Unit headers are chip labels with a physics glyph per unit. Headings in Chakra Petch; figures in Barlow Semi Condensed tabular; Thai body in Anuphan. No glass, no blur.
 
-STORY: The student sees where they are on the line, which stations are still unlit, and how many points the remaining stations must supply to reach the terminus they chose. They pick a target grade and chase the unlit stations.
+STORY: The student sees which pads are still unsoldered and how many points the remaining pieces must supply to reach the terminus they chose. They pick a target grade and chase the empty pads.
 
-FIRST VIEWPORT: Mobile: course name and term as a line sign; a departure-board readout (points so far as large tabular numerals, pieces missing, target-grade selector as terminus chips, "ต้องได้อีก" readout); the vertical strip map begins beneath with the first unit's line. Desktop: strip map left, readout board sticky right.
+FIRST VIEWPORT: Mobile: course chip label and term; the readout board (points so far, pieces missing, target-grade selector, "ต้องได้อีก"); the vertical trace begins beneath. Desktop: trace left, board sticky right.
 
-FORM: Midnight transit diagram (catalog challenger, chosen by the teacher over assigned list position 7); seed key 074954b4. Signature interaction: choosing a terminus re-lights the route and recomputes the needed points; the line draws in once on load, numbers never move.
+FORM: Neon circuit board, pinned by the teacher (replaces the earlier transit diagram, seed key 074954b4 superseded by the teacher's explicit pick). Signature: choosing a target re-weights the empty pads ("ควรได้ราว N") and their trace brightness; the trace reveals once on load; numbers never move.
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
 

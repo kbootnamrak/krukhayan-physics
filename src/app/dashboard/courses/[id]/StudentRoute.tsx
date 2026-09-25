@@ -3,14 +3,13 @@
 import { useSyncExternalStore } from "react";
 import { calcGrade, DEFAULT_GRADE_SCALE, type GradeScale } from "@/lib/grade";
 import { fmt, gradedItems, summarize, type ScoreLookup } from "@/lib/scores";
+import { EXAM_TRACE, unitTrace } from "@/lib/traces";
+import { UnitGlyph } from "@/components/PhysicsArt";
 
 type Unit = { id: string; title: string; sort_order: number };
 type Component = { id: string; unit_id: string; category: "K" | "P" | "A"; max_score: number };
 type Exam = { id: string; exam_type: "midterm" | "final"; max_score: number };
 
-/** หน่วยการเรียนแต่ละหน่วยเป็นรถไฟหนึ่งสาย สีวนตามลำดับหน่วย */
-const LINES = ["var(--line-scarlet)", "var(--line-cobalt)", "var(--line-amber)", "var(--line-green)"];
-const EXAM_LINE = "var(--porcelain)";
 
 const CATEGORY_NAME: Record<Component["category"], string> = {
   K: "ความรู้",
@@ -57,7 +56,7 @@ const memoryTargets = new Map<string, string>();
 
 /**
  * หน้า "คะแนนของฉัน" ของนักเรียน
- * งานทั้งเทอมวาดเป็นแผนผังรถไฟ: ชิ้นที่ตรวจแล้วเป็นสถานีทึบ ชิ้นที่ยังไม่มีคะแนนเป็นวงกลวง
+ * งานทั้งเทอมวาดเป็นลายวงจร: หนึ่งหน่วยหนึ่งเส้นทองแดง ชิ้นที่ตรวจแล้วเป็นจุดบัดกรีทึบ ชิ้นที่ยังไม่มีคะแนนเป็นวงกลวง
  * ปลายทางคือเกรดที่นักเรียนตั้งเป้า — ป้ายด้านข้างบอกว่าต้องได้อีกกี่คะแนน
  */
 export default function StudentRoute({
@@ -91,7 +90,7 @@ export default function StudentRoute({
           exam: false,
         }));
       if (stations.length) {
-        segments.push({ key: u.id, title: u.title, color: LINES[segments.length % LINES.length], exam: false, stations });
+        segments.push({ key: u.id, title: u.title, color: unitTrace(segments.length), exam: false, stations });
       }
     });
 
@@ -106,7 +105,7 @@ export default function StudentRoute({
       exam: true,
     }));
   if (examStations.length) {
-    segments.push({ key: "exams", title: "สอบ", color: EXAM_LINE, exam: true, stations: examStations });
+    segments.push({ key: "exams", title: "สอบ", color: EXAM_TRACE, exam: true, stations: examStations });
   }
 
   const summary = summarize(gradedItems(components, exams), myScore);
@@ -159,26 +158,26 @@ export default function StudentRoute({
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-12 items-start">
       {/* ป้ายบอกทาง: บนมือถือขึ้นก่อน บนจอกว้างอยู่ขวาและตามลงมาเวลาเลื่อน */}
       <aside className="lg:order-2 lg:sticky lg:top-6 rounded-md border-2 border-porcelain bg-white">
-        <h2 className="font-sign text-xl font-semibold text-slate-800 px-4 py-2.5 border-b-2 border-porcelain">
+        <h2 className="font-display text-xl font-semibold text-slate-800 px-4 py-2.5 border-b-2 border-porcelain">
           ป้ายบอกทางของฉัน
         </h2>
 
         <dl className="px-4 divide-y divide-slate-200">
           <BoardRow glyph="filled" label="ได้แล้ว">
-            <span className="font-sign tnum text-3xl font-semibold text-slate-800 leading-none">{fmt(summary.earned)}</span>
-            <span className="font-sign tnum text-slate-500 ml-1">/ {fmt(summary.maxAssessed)}</span>
+            <span className="font-num tnum text-3xl font-semibold text-slate-800 leading-none">{fmt(summary.earned)}</span>
+            <span className="font-num tnum text-slate-500 ml-1">/ {fmt(summary.maxAssessed)}</span>
           </BoardRow>
           <BoardRow glyph="hollow" label="ยังไม่มีคะแนน">
             {summary.missing === 0 ? (
               <span className="text-green-700 font-medium">ครบทุกชิ้นแล้ว</span>
             ) : (
-              <span className="font-sign tnum text-2xl font-semibold text-amber-700 leading-none">
+              <span className="font-num tnum text-2xl font-semibold text-amber-700 leading-none">
                 {summary.missing} <span className="font-sans text-sm font-normal">ชิ้น</span>
               </span>
             )}
           </BoardRow>
           <BoardRow glyph="end" label="คะแนนเต็มทั้งวิชา">
-            <span className="font-sign tnum text-2xl font-semibold text-slate-700 leading-none">{fmt(summary.maxAll)}</span>
+            <span className="font-num tnum text-2xl font-semibold text-slate-700 leading-none">{fmt(summary.maxAll)}</span>
           </BoardRow>
         </dl>
 
@@ -210,7 +209,7 @@ export default function StudentRoute({
                         aria-pressed={on}
                         aria-label={`ตั้งเป้าเกรด ${t.grade}${reachable ? "" : " (ไม่ทันแล้ว)"}`}
                         onClick={() => choose(t.grade)}
-                        className={`relative font-sign tnum shrink-0 size-10 rounded-full border-[3px] text-base font-semibold transition-colors ${
+                        className={`relative font-num tnum shrink-0 size-10 rounded-full border-[3px] text-base font-semibold transition-colors ${
                           on
                             ? "border-porcelain bg-porcelain text-[var(--c-slate-50)]"
                             : reachable
@@ -247,13 +246,16 @@ export default function StudentRoute({
                 <div className="flex items-stretch">
                   <Track color={si === 0 ? null : segments[si - 1].color} nextColor={seg.color} transfer first={si === 0} route={route} />
                   <div className={`py-3 pl-3 min-w-0 ${si === 0 ? "" : "pt-5"}`}>
+                    {/* ป้ายหน่วยแบบชิปบนแผ่นวงจร: ขอบสีของสาย + ไอคอนฟิสิกส์ของหน่วย */}
                     <span
-                      className="inline-flex max-w-full items-center rounded-md px-2.5 py-1 text-sm font-semibold leading-snug"
-                      style={{
-                        background: seg.color,
-                        color: seg.exam ? "var(--c-slate-50)" : seg.color === LINES[2] ? "var(--sign-ink)" : "white",
-                      }}
+                      className="inline-flex max-w-full items-center gap-2 rounded-sm border-2 px-2.5 py-1 font-display text-[15px] font-semibold leading-snug text-slate-800"
+                      style={{ borderColor: seg.color, background: `color-mix(in oklch, ${seg.color} 14%, transparent)` }}
                     >
+                      {!seg.exam && (
+                        <span className="shrink-0" style={{ color: seg.color }}>
+                          <UnitGlyph title={seg.title} className="size-5" />
+                        </span>
+                      )}
                       <span className="truncate">{seg.title}</span>
                     </span>
                   </div>
@@ -266,7 +268,7 @@ export default function StudentRoute({
                       <div className="flex flex-1 min-w-0 items-center justify-between gap-3 py-2.5 pl-3 border-b border-slate-200 group-last:border-b-0">
                         <div className="min-w-0">
                           <p className={`leading-snug ${st.score === null ? "text-slate-600" : "text-slate-800"} ${st.exam ? "font-semibold" : ""}`}>
-                            {!st.exam && <span className="font-sign font-semibold tracking-wide mr-1.5">{st.code}</span>}
+                            {!st.exam && <span className="font-display font-semibold mr-1.5">{st.code}</span>}
                             {st.name}
                           </p>
                           {st.score === null && (
@@ -275,7 +277,7 @@ export default function StudentRoute({
                               {share !== null && (
                                 <span className="text-slate-600">
                                   {" · "}เป้าเกรด {target!.grade} ควรได้ราว{" "}
-                                  <span className="font-sign tnum font-semibold text-slate-800">
+                                  <span className="font-num tnum font-semibold text-slate-800">
                                     {fmt(Math.min(st.max, Math.ceil(share * st.max * 2) / 2))}
                                   </span>
                                 </span>
@@ -283,7 +285,7 @@ export default function StudentRoute({
                             </p>
                           )}
                         </div>
-                        <p className="shrink-0 font-sign tnum text-right whitespace-nowrap">
+                        <p className="shrink-0 font-num tnum text-right whitespace-nowrap">
                           <span className={`text-xl font-semibold ${st.score === null ? "text-slate-400" : "text-slate-800"}`}>
                             {st.score === null ? "–" : fmt(st.score)}
                           </span>
@@ -333,7 +335,7 @@ function BoardRow({ glyph, label, children }: { glyph: "filled" | "hollow" | "en
     <div className="flex items-center justify-between gap-4 py-3">
       <dt className="flex items-center gap-2.5 text-sm text-slate-600">
         <span aria-hidden className="grid place-items-center size-4">
-          {glyph === "filled" && <span className="size-3.5 rounded-full border-2 border-porcelain bg-line-scarlet" />}
+          {glyph === "filled" && <span className="size-3.5 rounded-full border-2 border-porcelain bg-trace-magenta" />}
           {glyph === "hollow" && <span className="size-3.5 rounded-full border-2 border-porcelain" />}
           {glyph === "end" && <span className="h-[4px] w-4 rounded-full bg-porcelain" />}
         </span>
@@ -354,7 +356,7 @@ function Terminus({ grade, state, size = "md" }: { grade: string; state: RouteSt
         : "border-porcelain text-slate-800";
   return (
     <span
-      className={`shrink-0 grid place-items-center rounded-full border-[3px] bg-white font-sign tnum font-bold ${ring} ${
+      className={`shrink-0 grid place-items-center rounded-full border-[3px] bg-white font-num tnum font-bold ${ring} ${
         size === "lg" ? "size-16 text-2xl" : "size-12 text-lg"
       }`}
     >
@@ -389,7 +391,7 @@ function Forecast({
   } else {
     headline = (
       <>
-        ต้องได้อีก <span className="font-sign tnum text-4xl font-semibold leading-none">{fmt(Math.ceil(need * 100) / 100)}</span>{" "}
+        ต้องได้อีก <span className="font-num tnum text-4xl font-semibold leading-none">{fmt(Math.ceil(need * 100) / 100)}</span>{" "}
         <span className="text-slate-500 text-base font-normal">คะแนน</span>
       </>
     );
@@ -446,7 +448,7 @@ function Track({
       )}
       {nextColor && (
         <span
-          className={`absolute left-1/2 -translate-x-1/2 top-1/2 bottom-0 w-[5px] ${rail} ${first ? "rounded-t-full" : ""}`}
+          className={`absolute left-1/2 -translate-x-1/2 top-1/2 bottom-0 w-[5px] ${rail}`}
           style={{ background: nextColor, color: nextColor, ...railStyle }}
         />
       )}
@@ -456,12 +458,15 @@ function Track({
         <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 size-3.5 rounded-full border-[3px] border-porcelain bg-[var(--c-slate-50)]" />
       )}
       {station && (
+        // จุดบัดกรี (ชิ้นงาน) เป็นวงกลม · ข้อสอบเป็นชิปสี่เหลี่ยม · ทึบ = มีคะแนน, กลวง = ยังไม่มี
         <span
-          className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-porcelain ${
-            station.exam ? "size-6 border-[4px]" : "size-[18px] border-[3px]"
+          className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 grid place-items-center border-porcelain ${
+            station.exam ? "size-6 rounded-[3px] border-[3px]" : "size-[18px] rounded-full border-[3px]"
           } ${lit ? "route-glow" : "bg-[var(--c-slate-50)]"}`}
           style={lit ? { background: station.exam ? "var(--porcelain)" : color ?? undefined, color: color ?? undefined } : undefined}
-        />
+        >
+          {lit && !station.exam && <span className="size-1 rounded-full bg-[var(--c-slate-50)]" />}
+        </span>
       )}
     </div>
   );

@@ -1,11 +1,19 @@
 import type { Metadata } from "next";
-import { Anuphan, Barlow_Semi_Condensed } from "next/font/google";
+import { Anuphan, Barlow_Semi_Condensed, Chakra_Petch } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 
 const anuphan = Anuphan({
   subsets: ["thai", "latin"],
   variable: "--font-anuphan",
+  display: "swap",
+});
+
+// หัวข้อและป้าย: ทรงเหลี่ยมแบบไซเบอร์พังค์ และมีตัวอักษรไทยในตัว
+const chakra = Chakra_Petch({
+  subsets: ["thai", "latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-chakra",
   display: "swap",
 });
 
@@ -30,7 +38,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="th" className={`h-full antialiased ${anuphan.variable} ${barlow.variable}`} suppressHydrationWarning>
+    <html lang="th" className={`h-full antialiased ${anuphan.variable} ${chakra.variable} ${barlow.variable}`} suppressHydrationWarning>
       <body className="min-h-full flex flex-col font-sans">
         {/* beforeInteractive = ฝังใน HTML แรกจากเซิร์ฟเวอร์ ทำงานก่อนโค้ดของ Next */}
         <Script id="theme" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
