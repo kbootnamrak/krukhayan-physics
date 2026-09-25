@@ -53,6 +53,9 @@ export default function ScoresPanel({
   const [pending, setPending] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [exporting, setExporting] = useState(false);
+  // ตัวกรองห้อง ("" = ทุกห้อง) และคำค้นหา (ชื่อ / รหัส / เลขที่)
+  const [room, setRoom] = useState("");
+  const [query, setQuery] = useState("");
 
   // แสดงเฉพาะช่องที่ตั้งคะแนนเต็มไว้จริง — หน่วยที่ไม่มี A ก็ไม่ต้องมีคอลัมน์ A ว่าง ๆ
   const groups = useMemo((): { title: string; color: string; exam: boolean; columns: Column[] }[] => {
@@ -109,6 +112,27 @@ export default function ScoresPanel({
     .sort(compareRoster);
   const hasPlacement = students.some((s) => s.classroom !== null || s.class_number !== null);
 
+  // ห้องทั้งหมดที่มีในวิชานี้ เรียงแบบเดียวกับรายชื่อ พร้อมจำนวนคน
+  const rooms: { name: string; count: number }[] = [];
+  for (const st of students) {
+    if (!st.classroom) continue;
+    const r = rooms.find((x) => x.name === st.classroom);
+    if (r) r.count++;
+    else rooms.push({ name: st.classroom, count: 1 });
+  }
+  const activeRoom = rooms.some((r) => r.name === room) ? room : "";
+  const inRoom = activeRoom ? students.filter((st) => st.classroom === activeRoom) : students;
+  const q = query.trim().toLowerCase();
+  // ค้นได้ทั้งชื่อ นามสกุล รหัสนักเรียน และเลขที่ (พิมพ์ตัวเลขล้วนแล้วตรงกับเลขที่พอดีก็เจอ)
+  const visible = q
+    ? inRoom.filter(
+        (st) =>
+          st.full_name.toLowerCase().includes(q) ||
+          (st.student_code ?? "").includes(q) ||
+          (/^\d+$/.test(q) && st.class_number === Number(q))
+      )
+    : inRoom;
+
   const errorCount = Object.keys(errors).length;
 
   // เตือนก่อนปิดแท็บถ้ายังบันทึกไม่เสร็จหรือมีช่องที่บันทึกไม่สำเร็จ
@@ -144,7 +168,8 @@ export default function ScoresPanel({
         "เกรด",
         "หมายเหตุ",
       ];
-      const rows = students.map((en) => {
+      // ส่งออกตามห้องที่เลือกอยู่ (ไม่สนคำค้นหา) — เลือก "ทุกห้อง" ได้ไฟล์รวมทั้งวิชา
+      const rows = inRoom.map((en) => {
         const lookup = scoreLookup(scores, en.id);
         const summary = summarize(items, lookup);
         return [
@@ -167,7 +192,7 @@ export default function ScoresPanel({
       const data = XLSX.write(book, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
       downloadBlob(
         new Blob([data], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
-        `${exportName}.xlsx`
+        `${exportName}${activeRoom ? ` ${activeRoom.replace("/", "-")}` : ""}.xlsx`
       );
     } finally {
       setExporting(false);
@@ -206,10 +231,66 @@ export default function ScoresPanel({
             title={pending > 0 ? "รอบันทึกให้เสร็จก่อน" : undefined}
             className="text-sm border border-slate-300 rounded-md px-3 py-1.5 text-slate-700 hover:bg-slate-50 disabled:opacity-50"
           >
-            {exporting ? "กำลังสร้างไฟล์..." : "ดาวน์โหลด Excel"}
+            {exporting ? "กำลังสร้างไฟล์..." : `ดาวน์โหลด Excel${activeRoom ? ` (${activeRoom})` : ""}`}
           </button>
         </div>
       </div>
+
+      {/* แถบกรองห้อง + ค้นหา */}
+      <div className="flex flex-wrap items-center gap-2">
+        {rooms.length > 1 && (
+          <div role="group" aria-label="เลือกห้อง" className="flex flex-wrap gap-1">
+            {[{ name: "", count: students.length }, ...rooms].map((r) => {
+              const on = activeRoom === r.name;
+              return (
+                <button
+                  key={r.name || "all"}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => setRoom(r.name)}
+                  className={`rounded-sm border-2 px-3 py-1.5 text-sm font-display font-semibold ${
+                    on ? "border-porcelain bg-porcelain text-[var(--c-slate-50)]" : "border-slate-300 text-slate-600 hover:border-slate-400 hover:text-slate-800"
+                  }`}
+                >
+                  {r.name || "ทุกห้อง"} <span className={`font-num tnum font-medium ${on ? "" : "text-slate-400"}`}>{r.count}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <div className="relative ml-auto w-full sm:w-64">
+          <svg viewBox="0 0 24 24" className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+          </svg>
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter ในช่องค้นหา = ไปช่องคะแนนแรกของคนแรกที่เจอ กรอกต่อได้เลย
+              if (e.key !== "Enter") return;
+              e.preventDefault();
+              const first = document.querySelector<HTMLInputElement>('[data-cell="0-0"]');
+              first?.focus();
+              first?.select();
+            }}
+            placeholder="ค้นหาชื่อ รหัส หรือเลขที่"
+            aria-label="ค้นหานักเรียน"
+            className="w-full rounded-sm border border-slate-300 bg-white py-1.5 pl-8 pr-3 text-sm placeholder:text-slate-400"
+          />
+        </div>
+      </div>
+      {(activeRoom || q) && (
+        <p className="text-xs text-slate-500" aria-live="polite">
+          แสดง <span className="font-num tnum">{visible.length}</span> จาก <span className="font-num tnum">{students.length}</span> คน
+          {q && (
+            <button type="button" onClick={() => setQuery("")} className="ml-2 underline underline-offset-2 hover:text-slate-800">
+              ล้างคำค้นหา
+            </button>
+          )}
+        </p>
+      )}
 
       {errorCount > 0 && (
         <div className="bg-red-50 border border-red-300 rounded-lg p-3 text-sm text-red-800" role="alert">
@@ -262,7 +343,14 @@ export default function ScoresPanel({
             </tr>
           </thead>
           <tbody>
-            {students.map((en, row) => {
+            {visible.length === 0 && (
+              <tr>
+                <td colSpan={columns.length + 3} className="p-6 text-center text-sm text-slate-500">
+                  ไม่พบนักเรียนที่ตรงกับ &quot;{query}&quot;{activeRoom ? ` ใน ${activeRoom}` : ""}
+                </td>
+              </tr>
+            )}
+            {visible.map((en, row) => {
               const lookup = scoreLookup(scores, en.id);
               const summary = summarize(items, lookup);
               return (
