@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { studentCodeFromEmail } from "@/lib/school";
+import { detachAndDeleteStudentUser, isPinEmail, studentCodeFromPinEmail } from "@/lib/students/pin";
 
 export type LinkResult =
   | { ok: true; studentCode: string; enrolled: number }
@@ -8,25 +9,38 @@ export type LinkResult =
 /**
  * จับคู่บัญชีที่เพิ่งล็อกอินเข้ากับรายชื่อที่ครูนำเข้าไว้
  *
- * เรียกทุกครั้งที่ล็อกอินผ่าน /auth/callback ไม่ใช่เฉพาะครั้งแรก เพราะครูอาจ
- * นำเข้ารายชื่อของวิชาใหม่ทีหลัง นักเรียนคนเดิมจะได้ถูกลงทะเบียนเพิ่มให้เอง
- * โดยไม่ต้องทำอะไร ฟังก์ชันนี้ไม่ทำอะไรซ้ำถ้าจับคู่ไปแล้ว
+ * เรียกทุกครั้งที่ล็อกอิน (Google ผ่าน /auth/callback · PIN ผ่าน /api/students/link)
+ * ไม่ใช่เฉพาะครั้งแรก เพราะครูอาจนำเข้ารายชื่อของวิชาใหม่ทีหลัง นักเรียนคนเดิมจะได้
+ * ถูกลงทะเบียนเพิ่มให้เอง ฟังก์ชันนี้ไม่ทำอะไรซ้ำถ้าจับคู่ไปแล้ว
+ *
+ * รหัสนักเรียนมาจากอีเมลโรงเรียน (65001@urrw.ac.th) หรืออีเมลของบัญชี PIN
+ * ถ้าเป็นบัญชี Google ของโรงเรียน และรายชื่อถูกบัญชี PIN ของคนเดียวกันรับไว้ก่อน
+ * จะย้ายการลงทะเบียน (พร้อมคะแนนและผลแบบทดสอบ) มาที่บัญชี Google แล้วลบบัญชี PIN ทิ้ง
  */
 export async function linkStudentToRoster(
   admin: SupabaseClient,
   user: { id: string; email?: string | null }
 ): Promise<LinkResult> {
-  const studentCode = studentCodeFromEmail(user.email);
+  const fromSchool = studentCodeFromEmail(user.email);
+  const studentCode = fromSchool ?? studentCodeFromPinEmail(user.email);
   if (!studentCode) return { ok: false, reason: "not_school_email" };
 
-  // รายชื่อที่ยังไม่มีใครรับ หรือที่เป็นของคนนี้อยู่แล้ว
-  const { data: rosterRows } = await admin
+  const { data: allRows } = await admin
     .from("class_roster")
     .select("id, course_id, full_name, claimed_by")
-    .eq("student_code", studentCode)
-    .or(`claimed_by.is.null,claimed_by.eq.${user.id}`);
+    .eq("student_code", studentCode);
 
-  const rows = rosterRows ?? [];
+  // บัญชี PIN ของรหัสนี้ที่ถือรายชื่ออยู่ — บัญชี Google ของโรงเรียนรับช่วงต่อได้
+  const pinHolders = new Set<string>();
+  if (fromSchool) {
+    for (const holder of new Set((allRows ?? []).map((r) => r.claimed_by).filter((id): id is string => !!id && id !== user.id))) {
+      const { data } = await admin.auth.admin.getUserById(holder);
+      if (isPinEmail(data.user?.email)) pinHolders.add(holder);
+    }
+  }
+
+  // รายชื่อที่ยังไม่มีใครรับ ที่เป็นของคนนี้อยู่แล้ว หรือที่บัญชี PIN ของคนเดียวกันถือไว้
+  const rows = (allRows ?? []).filter((r) => !r.claimed_by || r.claimed_by === user.id || pinHolders.has(r.claimed_by));
 
   // ชื่อภาษาไทยจาก Excel ของครูอ่านง่ายกว่าชื่อที่ตั้งไว้ในบัญชี Google
   const nameFromRoster = rows[0]?.full_name ?? null;
@@ -69,6 +83,9 @@ export async function linkStudentToRoster(
 
     enrolled++;
   }
+
+  // ย้ายครบแล้ว บัญชี PIN ไม่มีรายชื่อเหลือ — ลบทิ้ง (ฟังก์ชันนี้ไม่ลบถ้ายังมีการลงทะเบียนผูกอยู่)
+  for (const holder of pinHolders) await detachAndDeleteStudentUser(admin, holder);
 
   return { ok: true, studentCode, enrolled };
 }
