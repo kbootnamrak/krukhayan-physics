@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { dbErrorMessage } from "@/lib/db-error";
 import { downloadBlob } from "@/lib/download";
 import { compareRoster } from "@/lib/students/order";
+import { describeDevice, type DeviceEvent } from "@/lib/device";
 import { SUBMIT_REASON_TEXT, type Quiz, type QuizAttempt } from "@/lib/quiz";
 
 /** เวลารวมที่ออกไปจากหน้าข้อสอบ (วินาที) */
@@ -39,12 +40,15 @@ export default function ResultsPanel({
   quiz,
   enrollments,
   attempts,
+  devices,
   loadedAt,
   onChanged,
 }: {
   quiz: Quiz;
   enrollments: RosterEnrollment[];
   attempts: QuizAttempt[];
+  /** เครื่องที่ใช้เริ่มทำชุดนี้ (บันทึกตอนเริ่ม/ทำต่อ) */
+  devices: DeviceEvent[];
   /** เวลาตอนโหลดข้อมูล — ใช้ตัดสินว่าการทำไหนหมดเวลาแล้ว */
   loadedAt: number;
   onChanged: () => void;
@@ -58,11 +62,32 @@ export default function ResultsPanel({
   const rooms = [...new Set(enrollments.map((e) => e.class_roster?.classroom).filter((r): r is string => !!r))].sort(th.compare);
   const now = loadedAt;
 
+  // เครื่องที่นักเรียนแต่ละคนใช้ทำชุดนี้ และเครื่องที่ถูกใช้ทำหลายบัญชี
+  const nameOfUser = new Map(enrollments.filter((e) => e.student_id).map((e) => [e.student_id as string, e.class_roster?.full_name ?? "(ไม่มีชื่อ)"]));
+  const usersOfDevice = new Map<string, Set<string>>();
+  for (const d of devices) {
+    if (!usersOfDevice.has(d.device_id)) usersOfDevice.set(d.device_id, new Set());
+    usersOfDevice.get(d.device_id)!.add(d.user_id);
+  }
+  function deviceInfo(studentId: string | null) {
+    if (!studentId) return null;
+    const mine = devices.filter((d) => d.user_id === studentId);
+    if (!mine.length) return null;
+    const others = new Set<string>();
+    for (const d of mine) usersOfDevice.get(d.device_id)?.forEach((u) => u !== studentId && others.add(u));
+    return {
+      label: [...new Set(mine.map((d) => describeDevice(d.user_agent)))].join(", "),
+      sharedWith: [...others].map((u) => nameOfUser.get(u) ?? "บัญชีอื่น"),
+    };
+  }
+  const sharedCount = [...usersOfDevice.values()].filter((u) => u.size > 1).length;
+
   const rows = enrollments
     .map((e) => ({
       id: e.id,
       full_name: e.class_roster?.full_name ?? "(ไม่มีชื่อ)",
       student_code: e.class_roster?.student_code ?? null,
+      student_id: e.student_id,
       classroom: e.class_roster?.classroom ?? null,
       class_number: e.class_roster?.class_number ?? null,
       attempt: attempts.find((a) => a.enrollment_id === e.id) ?? null,
@@ -216,6 +241,12 @@ export default function ResultsPanel({
       )}
       {notice && <p className="text-sm text-green-700" aria-live="polite">{notice}</p>}
 
+      {sharedCount > 0 && (
+        <p className="text-sm text-amber-900 bg-amber-50 border border-amber-300 rounded-sm px-3 py-2">
+          มี {sharedCount} เครื่องที่ถูกใช้ทำแบบทดสอบนี้มากกว่า 1 บัญชี — ดูคอลัมน์ &quot;เครื่องที่ใช้ทำ&quot; (อาจเป็นการทำแทนกัน ควรสอบถามก่อนสรุป)
+        </p>
+      )}
+
       <p className="text-sm text-slate-600">
         ส่งแล้ว <span className="font-num tnum font-semibold text-slate-800">{submitted.length}</span> จาก{" "}
         <span className="font-num tnum">{rows.length}</span> คน
@@ -234,6 +265,7 @@ export default function ResultsPanel({
             <tr className="text-left text-slate-500 border-b border-slate-200">
               <th className="p-2 font-medium">นักเรียน</th>
               <th className="p-2 font-medium">สถานะ</th>
+              <th className="p-2 font-medium">เครื่องที่ใช้ทำ</th>
               <th className="p-2 font-medium text-right" title="จำนวนครั้งที่ออกจากหน้าข้อสอบระหว่างทำ (สลับแอป/แท็บ/รีเฟรช)">
                 ออกจากหน้า
               </th>
@@ -253,6 +285,20 @@ export default function ResultsPanel({
                     </span>
                   </td>
                   <td className={`p-2 ${st.cls}`}>{st.text}</td>
+                  <td className="p-2 text-xs">
+                    {(() => {
+                      const info = r.attempt ? deviceInfo(r.student_id) : null;
+                      if (!info) return <span className="text-slate-400">–</span>;
+                      return (
+                        <>
+                          <span className="text-slate-600">{info.label}</span>
+                          {info.sharedWith.length > 0 && (
+                            <span className="block font-semibold text-amber-700">เครื่องเดียวกับ: {info.sharedWith.join(", ")}</span>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </td>
                   <td
                     className={`p-2 text-right font-num tnum ${r.attempt && r.attempt.leave_count > 0 ? "text-amber-700 font-semibold" : "text-slate-400"}`}
                     title={r.attempt?.leave_log?.length ? leaveTitle(r.attempt) : undefined}

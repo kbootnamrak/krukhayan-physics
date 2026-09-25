@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { dbErrorMessage } from "@/lib/db-error";
 import type { Quiz, QuizAttempt, QuizQuestion, QuizSession } from "@/lib/quiz";
 import Breadcrumbs from "../../Breadcrumbs";
+import type { DeviceEvent } from "@/lib/device";
 import QuestionsEditor from "./QuestionsEditor";
 import SessionsPanel from "./SessionsPanel";
 import ResultsPanel, { type RosterEnrollment } from "./ResultsPanel";
@@ -30,6 +31,7 @@ export default function QuizPage({ params }: { params: Promise<{ quizId: string 
   const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
   const [tab, setTab] = useState<Tab>("questions");
   const [loadedAt, setLoadedAt] = useState(0);
+  const [devices, setDevices] = useState<DeviceEvent[]>([]);
 
   const load = useCallback(async () => {
     // หน้านี้สำหรับครู — นักเรียนที่เข้าลิงก์นี้ พาไปหน้าทำแบบทดสอบแทน
@@ -59,6 +61,11 @@ export default function QuizPage({ params }: { params: Promise<{ quizId: string 
         .select("id, quiz_id, enrollment_id, started_at, deadline_at, submitted_at, score, max_score, answers, leave_count, leave_log, submit_reason")
         .eq("quiz_id", quizId),
     ]);
+    const { data: dev } = await supabase
+      .from("device_events")
+      .select("user_id, device_id, user_agent, ip, kind, quiz_id, at")
+      .eq("quiz_id", quizId);
+    setDevices((dev as DeviceEvent[]) ?? []);
     const ids = ((qqRes.data as QuizQuestion[]) ?? []).map((x) => x.id);
     const keyRes = ids.length
       ? await supabase.from("quiz_answer_keys").select("question_id, correct_index").in("question_id", ids)
@@ -152,7 +159,7 @@ export default function QuizPage({ params }: { params: Promise<{ quizId: string 
 
         {tab === "questions" && <QuestionsEditor quizId={quizId} questions={questions} keys={keys} locked={attempts.length > 0} onChanged={load} />}
         {tab === "sessions" && <SessionsPanel quizId={quizId} sessions={sessions} enrollments={enrollments} attempts={attempts} ready={questions.length > 0} onChanged={load} />}
-        {tab === "results" && <ResultsPanel quiz={quiz} enrollments={enrollments} attempts={attempts} loadedAt={loadedAt} onChanged={load} />}
+        {tab === "results" && <ResultsPanel quiz={quiz} enrollments={enrollments} attempts={attempts} devices={devices} loadedAt={loadedAt} onChanged={load} />}
       </div>
     </div>
   );

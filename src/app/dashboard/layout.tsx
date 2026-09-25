@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import DashboardHeader from "./DashboardHeader";
+import DeviceBeacon from "./DeviceBeacon";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -14,6 +15,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
       <DashboardHeader displayName={user ? (profile?.full_name ?? user.email ?? "") : null} />
+      {user && <DeviceBeacon />}
       <main className="flex-1">{children}</main>
     </div>
   );
