@@ -10,6 +10,13 @@ const Y = "var(--trace-yellow)";
 const L = "var(--trace-lime)";
 const INK = "var(--porcelain)";
 
+// คลื่นทำจากครึ่งคาบต่อกัน (ครึ่งคาบละ 60 → ความยาวคลื่น 120) ยาวพอเลื่อนได้หนึ่งคาบโดยไม่เห็นปลาย
+const halfWaves = (n: number, half: number) => Array.from({ length: n }, () => `t ${half} 0`).join(" ");
+const WAVE_E = `q 30 -44 60 0 ${halfWaves(13, 60)}`;
+const WAVE_B = `q 30 18 60 0 ${halfWaves(13, 60)}`;
+const BANNER_WAVE_E = `q 25 -40 50 0 ${halfWaves(12, 50)}`;
+const BANNER_WAVE_B = `q 25 16 50 0 ${halfWaves(12, 50)}`;
+
 /** ฟิลเตอร์แสงเรืองแบบหลอดนีออน — ธีมสว่างปิดด้วย .neon-off */
 function NeonFilter({ id }: { id: string }) {
   return (
@@ -53,9 +60,16 @@ export function PhysicsHero({ className = "" }: { className?: string }) {
       {/* สนามแม่เหล็ก: เส้นสนามออกจาก N วนเข้า S */}
       <g filter="url(#hero-neon)" className="neon-soft" strokeWidth="2.2">
         {[40, 72, 108, 150].map((r, i) => (
-          <g key={r} stroke={i % 2 ? C : M} strokeOpacity={0.9 - i * 0.16}>
-            <path d={`M232 260 C 232 ${260 - r * 1.25}, 408 ${260 - r * 1.25}, 408 260`} />
-            <path d={`M232 300 C 232 ${300 + r * 1.25}, 408 ${300 + r * 1.25}, 408 300`} />
+          <g key={r} stroke={i % 2 ? C : M}>
+            {/* เส้นสนามจาง ๆ เป็นราง + จุดแสงไหลจาก N ไป S ตามทิศของสนาม (แบบกระแสในสายไฟ) */}
+            <g strokeOpacity={0.35 - i * 0.05}>
+              <path d={`M232 260 C 232 ${260 - r * 1.25}, 408 ${260 - r * 1.25}, 408 260`} />
+              <path d={`M232 300 C 232 ${300 + r * 1.25}, 408 ${300 + r * 1.25}, 408 300`} />
+            </g>
+            <g strokeOpacity={0.95 - i * 0.12} strokeWidth="2.6" strokeLinecap="round" className="field-flow" style={{ animationDuration: `${1.4 + i * 0.35}s` }}>
+              <path d={`M232 260 C 232 ${260 - r * 1.25}, 408 ${260 - r * 1.25}, 408 260`} />
+              <path d={`M232 300 C 232 ${300 + r * 1.25}, 408 ${300 + r * 1.25}, 408 300`} />
+            </g>
           </g>
         ))}
         {/* หัวลูกศรบอกทิศของสนาม (จาก N ไป S ด้านนอกแท่ง) */}
@@ -75,18 +89,21 @@ export function PhysicsHero({ className = "" }: { className?: string }) {
         </text>
       </g>
 
-      {/* คลื่นแม่เหล็กไฟฟ้า: E (เหลือง) กับ B (เขียวมะนาว) ตั้งฉากกัน */}
+      {/* คลื่นแม่เหล็กไฟฟ้า: E (เหลือง) กับ B (เขียวมะนาว) ตั้งฉากกัน เคลื่อนที่ไปทางขวา */}
+      <defs>
+        <clipPath id="hero-wave-clip">
+          <rect x="36" y="410" width="584" height="100" />
+        </clipPath>
+      </defs>
       <g filter="url(#hero-neon)" className="neon-soft" strokeWidth="2.4" strokeLinecap="round">
-        <path
-          d="M40 470 q 30 -44 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0"
-          stroke={Y}
-        />
-        <path
-          d="M40 470 q 30 18 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0"
-          stroke={L}
-          strokeOpacity="0.8"
-        />
-        <path d="M32 470h584" stroke={INK} strokeOpacity="0.35" strokeWidth="1.5" strokeDasharray="4 6" />
+        <g clipPath="url(#hero-wave-clip)">
+          {/* เส้นยาวเกินกรอบไปหนึ่งความยาวคลื่น แล้วเลื่อนทีละหนึ่งความยาวคลื่น (120) วนไปเรื่อย ๆ */}
+          <g className="wave-travel">
+            <path d={`M-80 470 ${WAVE_E}`} stroke={Y} />
+            <path d={`M-80 470 ${WAVE_B}`} stroke={L} strokeOpacity="0.8" />
+          </g>
+        </g>
+        <path d="M32 470h588" stroke={INK} strokeOpacity="0.35" strokeWidth="1.5" strokeDasharray="4 6" />
       </g>
 
       {/* วงจร: แบตเตอรี่ ตัวต้านทาน ตัวเก็บประจุ บนลายทองแดง */}
@@ -139,6 +156,11 @@ export function PhysicsBanner({ className = "" }: { className?: string }) {
   return (
     <svg viewBox="0 0 960 200" preserveAspectRatio="xMaxYMid slice" className={className} aria-hidden fill="none">
       <NeonFilter id="banner-neon" />
+      <defs>
+        <clipPath id="banner-wave-clip">
+          <rect x="520" y="90" width="440" height="70" />
+        </clipPath>
+      </defs>
       <g stroke={INK} strokeOpacity="0.12" strokeWidth="2" strokeLinecap="square">
         <path d="M420 0v40l30 30h140l30 -30V0" />
         <path d="M960 150H840l-30 30H700" />
@@ -150,11 +172,21 @@ export function PhysicsBanner({ className = "" }: { className?: string }) {
         <circle cx="504" cy="136" r="5" />
       </g>
       <g filter="url(#banner-neon)" className="neon-soft" strokeWidth="2.2" strokeLinecap="round">
-        <path d="M520 128 q 25 -40 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0" stroke={Y} />
-        <path d="M520 128 q 25 16 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0" stroke={L} strokeOpacity="0.75" />
+        <g clipPath="url(#banner-wave-clip)">
+          <g className="wave-travel wave-travel-100">
+            <path d={`M420 128 ${BANNER_WAVE_E}`} stroke={Y} />
+            <path d={`M420 128 ${BANNER_WAVE_B}`} stroke={L} strokeOpacity="0.75" />
+          </g>
+        </g>
         {[26, 46, 70].map((r, i) => (
-          <g key={r} stroke={i % 2 ? C : M} strokeOpacity={0.85 - i * 0.2}>
-            <path d={`M700 78 C 700 ${78 - r}, 820 ${78 - r}, 820 78`} />
+          <g key={r} stroke={i % 2 ? C : M}>
+            <path d={`M700 78 C 700 ${78 - r}, 820 ${78 - r}, 820 78`} strokeOpacity={0.3} />
+            <path
+              d={`M700 78 C 700 ${78 - r}, 820 ${78 - r}, 820 78`}
+              strokeOpacity={0.9 - i * 0.2}
+              className="field-flow"
+              style={{ animationDuration: `${1.3 + i * 0.35}s` }}
+            />
           </g>
         ))}
       </g>
