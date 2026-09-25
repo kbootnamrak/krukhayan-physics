@@ -155,9 +155,9 @@ export default function StudentRoute({
   const share = route === "needed" && remaining > 0 ? need / remaining : null;
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-12 items-start">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-12 items-start">
       {/* ป้ายบอกทาง: บนมือถือขึ้นก่อน บนจอกว้างอยู่ขวาและตามลงมาเวลาเลื่อน */}
-      <aside className="lg:order-2 lg:sticky lg:top-6 rounded-md border-2 border-porcelain bg-white">
+      <aside className="min-w-0 lg:order-2 lg:sticky lg:top-6 rounded-md border-2 border-porcelain bg-white">
         <h2 className="font-display text-xl font-semibold text-slate-800 px-4 py-2.5 border-b-2 border-porcelain">
           ป้ายบอกทางของฉัน
         </h2>
@@ -196,8 +196,8 @@ export default function StudentRoute({
             <div className="border-t-2 border-porcelain px-4 pt-3 pb-4 space-y-4">
               <fieldset>
                 <legend className="text-sm text-slate-600 mb-2">ตั้งเป้าเกรดไว้ที่</legend>
-                {/* ตัวเลือกเป้าเป็นสถานีบนรางสั้น ๆ แนวนอน */}
-                <div className="relative flex justify-between gap-1 overflow-x-auto py-0.5">
+                {/* ตัวเลือกเป้าเป็นสถานีบนรางสั้น ๆ แนวนอน — ปุ่มยืดหดตามความกว้าง จอมือถือเล็ก (320px) ก็ครบทุกเกรดในแถวเดียว */}
+                <div className="relative flex justify-between gap-1 py-0.5">
                   <span aria-hidden className="absolute left-3 right-3 top-1/2 -translate-y-1/2 h-[5px] bg-slate-300" />
                   {targets.map((t) => {
                     const on = t.grade === target.grade;
@@ -209,7 +209,7 @@ export default function StudentRoute({
                         aria-pressed={on}
                         aria-label={`ตั้งเป้าเกรด ${t.grade}${reachable ? "" : " (ไม่ทันแล้ว)"}`}
                         onClick={() => choose(t.grade)}
-                        className={`relative font-num tnum shrink-0 size-10 rounded-full border-[3px] text-base font-semibold transition-colors ${
+                        className={`relative font-num tnum aspect-square min-w-0 flex-1 max-w-11 rounded-full border-[3px] text-base font-semibold transition-colors ${
                           on
                             ? "border-porcelain bg-porcelain text-[var(--c-slate-50)]"
                             : reachable
@@ -256,7 +256,8 @@ export default function StudentRoute({
                           <UnitGlyph title={seg.title} className="size-5" />
                         </span>
                       )}
-                      <span className="truncate">{seg.title}</span>
+                      {/* ชื่อหน่วยยาวขึ้นบรรทัดใหม่ ไม่ตัดทิ้ง — มือถือจอแคบจะได้อ่านครบ */}
+                      <span className="min-w-0 break-words">{seg.title}</span>
                     </span>
                   </div>
                 </div>
