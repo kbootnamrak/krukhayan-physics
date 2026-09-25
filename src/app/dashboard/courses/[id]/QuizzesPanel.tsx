@@ -229,7 +229,8 @@ export default function QuizzesPanel({
         }
         return (
           <li key={q.id} className="bg-white border-2 border-slate-200 rounded-sm p-4 flex flex-wrap items-center gap-3">
-            <span className="min-w-0 flex-1">
+            {/* มือถือ: ชื่อเต็มแถว สถานะ + ปุ่มขึ้นแถวล่าง */}
+            <span className="min-w-0 basis-full sm:basis-0 sm:flex-1">
               <span className="block font-display text-lg font-semibold text-slate-800">{q.title}</span>
               {unitTitle(q.unit_id) && <span className="block text-sm text-slate-500">{unitTitle(q.unit_id)}</span>}
             </span>
@@ -246,7 +247,7 @@ function TakeLink({ quizId, label, primary }: { quizId: string; label: string; p
   return (
     <Link
       href={`/dashboard/quizzes/${quizId}/take`}
-      className={`rounded-sm px-4 py-2 text-sm font-semibold ${
+      className={`inline-flex min-h-12 items-center justify-center rounded-sm px-5 py-2 text-sm font-semibold ml-auto sm:ml-0 sm:min-h-0 ${
         primary ? "bg-[oklch(50%_0.24_345)] text-[oklch(100%_0_0)] hover:bg-[oklch(55%_0.25_345)]" : "border-2 border-porcelain text-slate-800 hover:bg-slate-100"
       }`}
     >
