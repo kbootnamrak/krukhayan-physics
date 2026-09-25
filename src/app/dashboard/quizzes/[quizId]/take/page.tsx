@@ -92,7 +92,7 @@ export default function TakeQuizPage({ params }: { params: Promise<{ quizId: str
         )}
 
         {phase.kind === "intro" && (
-          <div className="bg-white border-2 border-porcelain rounded-sm p-6 space-y-5">
+          <div className="bg-white border-2 border-porcelain rounded-sm p-5 sm:p-6 space-y-5">
             <h1 className="font-display text-2xl font-bold text-slate-800">{phase.title}</h1>
             <ul className="list-disc pl-5 space-y-2 text-slate-700">
               <li>
@@ -109,11 +109,11 @@ export default function TakeQuizPage({ params }: { params: Promise<{ quizId: str
               )}
               <li>หน้าข้อสอบมีชื่อและรหัสของคุณเป็นลายน้ำ และระบบบันทึกเครื่องที่ใช้ทำ</li>
             </ul>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <button
                 type="button"
                 onClick={() => start(phase.courseId, phase.title)}
-                className="rounded-sm px-5 py-2.5 font-semibold bg-[oklch(50%_0.24_345)] text-[oklch(100%_0_0)] hover:bg-[oklch(55%_0.25_345)]"
+                className="min-h-12 rounded-sm px-5 py-2.5 font-semibold bg-[oklch(50%_0.24_345)] text-[oklch(100%_0_0)] hover:bg-[oklch(55%_0.25_345)]"
               >
                 เริ่มทำ
               </button>
@@ -132,7 +132,7 @@ export default function TakeQuizPage({ params }: { params: Promise<{ quizId: str
         )}
 
         {phase.kind === "done" && (
-          <div className="bg-white border-2 border-porcelain rounded-sm p-6 text-center space-y-3">
+          <div className="bg-white border-2 border-porcelain rounded-sm p-5 sm:p-6 text-center space-y-3">
             <h1 className="font-display text-xl font-semibold text-slate-800">{phase.title}</h1>
             <p className="text-slate-600">
               {phase.reason === "left_page"
@@ -162,7 +162,10 @@ export default function TakeQuizPage({ params }: { params: Promise<{ quizId: str
 
 function BackLink({ courseId, label = "กลับไปหน้ารายวิชา" }: { courseId: string; label?: string }) {
   return (
-    <Link href={`/dashboard/courses/${courseId}`} className="inline-block rounded-sm border-2 border-porcelain px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100">
+    <Link
+      href={`/dashboard/courses/${courseId}`}
+      className="inline-flex min-h-12 items-center justify-center rounded-sm border-2 border-porcelain px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100 sm:min-h-0"
+    >
       {label}
     </Link>
   );
@@ -290,6 +293,14 @@ function Taking({ data, onFinished }: { data: TakePayload; onFinished: (result: 
   const q = data.questions[index];
   const who = [data.student?.name, data.student?.code].filter(Boolean).join(" · ") || "KruKhayan Physics";
 
+  const questionRef = useRef<HTMLElement>(null);
+  function go(i: number) {
+    setIndex(Math.max(0, Math.min(total - 1, i)));
+    // โจทย์ยาวบนมือถือ กดถัดไปจากล่างจอแล้วต้องเห็นข้อใหม่ตั้งแต่ต้น (เลื่อนเฉพาะเมื่อต้นโจทย์ถูกแถบเวลาบังหรือพ้นจอไปแล้ว)
+    const el = questionRef.current;
+    if (el && el.getBoundingClientRect().top < 64) el.scrollIntoView({ block: "start" });
+  }
+
   function confirmSubmit() {
     setReviewing(true);
     window.scrollTo({ top: 0 });
@@ -315,7 +326,9 @@ function Taking({ data, onFinished }: { data: TakePayload; onFinished: (result: 
       <div className="sticky top-0 z-20 -mx-4 sm:mx-0 px-4 py-3 bg-slate-50 border-b-2 border-slate-200 flex items-center gap-3">
         <h1 className="min-w-0 flex-1 truncate font-display font-semibold text-slate-800">{data.title}</h1>
         <span className="text-sm text-slate-600 whitespace-nowrap">
-          ตอบแล้ว <span className="font-num tnum font-semibold text-slate-800">{answered}</span>/<span className="font-num tnum">{total}</span>
+          <span className="hidden sm:inline">ตอบแล้ว </span>
+          <span className="font-num tnum font-semibold text-slate-800">{answered}</span>/<span className="font-num tnum">{total}</span>
+          <span className="sm:hidden"> ข้อ</span>
         </span>
         <span aria-label={`เหลือเวลา ${mm} นาที ${ss} วินาที`} className={`font-num tnum text-2xl font-bold ${urgent ? "text-red-600" : "text-slate-800"}`}>
           {mm}:{ss}
@@ -355,10 +368,10 @@ function Taking({ data, onFinished }: { data: TakePayload; onFinished: (result: 
                     key={x.id}
                     type="button"
                     onClick={() => {
-                      setIndex(x.n - 1);
+                      go(x.n - 1);
                       setReviewing(false);
                     }}
-                    className="font-num tnum h-9 min-w-9 px-2 rounded-sm border-2 border-amber-300 text-sm font-semibold text-amber-800"
+                    className="font-num tnum h-11 min-w-11 px-2 rounded-sm border-2 border-amber-300 text-sm font-semibold text-amber-800 sm:h-9 sm:min-w-9"
                   >
                     {x.n}
                   </button>
@@ -374,7 +387,7 @@ function Taking({ data, onFinished }: { data: TakePayload; onFinished: (result: 
               type="button"
               onClick={() => setReviewing(false)}
               disabled={submitting}
-              className="flex-1 rounded-sm border-2 border-slate-300 py-2.5 font-semibold text-slate-700 disabled:opacity-50"
+              className="flex-1 min-h-12 rounded-sm border-2 border-slate-300 py-2.5 font-semibold text-slate-700 disabled:opacity-50 sm:min-h-0"
             >
               กลับไปตรวจคำตอบ
             </button>
@@ -382,7 +395,7 @@ function Taking({ data, onFinished }: { data: TakePayload; onFinished: (result: 
               type="button"
               onClick={submit}
               disabled={submitting}
-              className="flex-1 rounded-sm py-2.5 font-semibold bg-[oklch(50%_0.24_345)] text-[oklch(100%_0_0)] hover:bg-[oklch(55%_0.25_345)] disabled:opacity-50"
+              className="flex-1 min-h-12 rounded-sm py-2.5 font-semibold bg-[oklch(50%_0.24_345)] text-[oklch(100%_0_0)] hover:bg-[oklch(55%_0.25_345)] disabled:opacity-50 sm:min-h-0"
             >
               {submitting ? "กำลังส่ง..." : "ยืนยันส่งคำตอบ"}
             </button>
@@ -394,7 +407,11 @@ function Taking({ data, onFinished }: { data: TakePayload; onFinished: (result: 
       <>
       {/* ข้อปัจจุบัน */}
       {q && (
-        <section aria-label={`ข้อ ${index + 1} จาก ${total}`} className="bg-white border border-slate-200 rounded-sm p-4 space-y-3">
+        <section
+          ref={questionRef}
+          aria-label={`ข้อ ${index + 1} จาก ${total}`}
+          className="scroll-mt-16 bg-white border border-slate-200 rounded-sm p-4 space-y-3"
+        >
           <p className="text-slate-800 leading-relaxed">
             <span className="font-display font-bold mr-1.5">{index + 1}.</span>
             <QuizText text={q.prompt} />
@@ -414,7 +431,7 @@ function Taking({ data, onFinished }: { data: TakePayload; onFinished: (result: 
                   aria-checked={on}
                   disabled={submitting}
                   onClick={() => choose(q.id, c.k)}
-                  className={`flex items-start gap-3 rounded-sm border-2 px-3 py-2.5 text-left transition-colors ${
+                  className={`flex min-h-12 items-start gap-3 rounded-sm border-2 px-3 py-2.5 text-left transition-colors ${
                     on ? "border-trace-cyan bg-[color-mix(in_oklch,var(--trace-cyan)_14%,transparent)]" : "border-slate-200 hover:border-slate-400"
                   }`}
                 >
@@ -435,30 +452,32 @@ function Taking({ data, onFinished }: { data: TakePayload; onFinished: (result: 
         </section>
       )}
 
-      {/* ก่อนหน้า / ถัดไป */}
-      <div className="flex gap-3">
+      {/* ก่อนหน้า / ถัดไป — มือถือ: ติดขอบล่างจอ นิ้วโป้งกดถึงเสมอ ไม่ว่าโจทย์จะยาวแค่ไหน */}
+      <div className="sticky bottom-0 z-20 -mx-4 flex gap-3 border-t-2 border-slate-200 bg-slate-50 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0">
         <button
           type="button"
-          onClick={() => setIndex((i) => Math.max(0, i - 1))}
+          onClick={() => go(index - 1)}
           disabled={index === 0}
-          className="flex-1 rounded-sm border-2 border-slate-300 py-2.5 font-semibold text-slate-700 disabled:opacity-30"
+          className="flex flex-1 min-h-12 items-center justify-center gap-1.5 rounded-sm border-2 border-slate-300 py-2.5 font-semibold text-slate-700 disabled:opacity-30 sm:min-h-0"
         >
-          ← ข้อก่อนหน้า
+          <Arrow back />
+          ข้อก่อนหน้า
         </button>
         {index < total - 1 ? (
           <button
             type="button"
-            onClick={() => setIndex((i) => Math.min(total - 1, i + 1))}
-            className="flex-1 rounded-sm border-2 border-porcelain py-2.5 font-semibold text-slate-800"
+            onClick={() => go(index + 1)}
+            className="flex flex-1 min-h-12 items-center justify-center gap-1.5 rounded-sm border-2 border-porcelain bg-white py-2.5 font-semibold text-slate-800 sm:min-h-0"
           >
-            ข้อถัดไป →
+            ข้อถัดไป
+            <Arrow />
           </button>
         ) : (
           <button
             type="button"
             onClick={confirmSubmit}
             disabled={submitting}
-            className="flex-1 rounded-sm py-2.5 font-semibold bg-[oklch(50%_0.24_345)] text-[oklch(100%_0_0)] hover:bg-[oklch(55%_0.25_345)] disabled:opacity-50"
+            className="flex-1 min-h-12 rounded-sm py-2.5 font-semibold sm:min-h-0 bg-[oklch(50%_0.24_345)] text-[oklch(100%_0_0)] hover:bg-[oklch(55%_0.25_345)] disabled:opacity-50"
           >
             {submitting ? "กำลังส่ง..." : "ส่งคำตอบ"}
           </button>
@@ -467,7 +486,7 @@ function Taking({ data, onFinished }: { data: TakePayload; onFinished: (result: 
 
       {/* เลขข้อทั้งหมด: กดกระโดดไปข้อนั้น · ทึบ = ตอบแล้ว */}
       <nav aria-label="เลือกข้อ" className="bg-white border border-slate-200 rounded-sm p-3 space-y-3">
-        <div className="grid grid-cols-8 sm:grid-cols-10 gap-1.5">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(2.75rem,1fr))] gap-1.5 sm:grid-cols-10">
           {data.questions.map((qq, i) => {
             const done = answers[qq.id] !== undefined;
             const current = i === index;
@@ -475,10 +494,10 @@ function Taking({ data, onFinished }: { data: TakePayload; onFinished: (result: 
               <button
                 key={qq.id}
                 type="button"
-                onClick={() => setIndex(i)}
+                onClick={() => go(i)}
                 aria-label={`ไปข้อ ${i + 1}${done ? " (ตอบแล้ว)" : ""}`}
                 aria-current={current ? "step" : undefined}
-                className={`font-num tnum h-9 rounded-sm border-2 text-sm font-semibold ${
+                className={`font-num tnum h-11 rounded-sm border-2 text-sm font-semibold sm:h-9 ${
                   done ? "bg-trace-cyan border-trace-cyan text-[var(--sign-ink)]" : "border-slate-300 text-slate-600"
                 } ${current ? "ring-2 ring-offset-2 ring-offset-[var(--c-white)] ring-[var(--porcelain)]" : ""}`}
               >
@@ -491,7 +510,7 @@ function Taking({ data, onFinished }: { data: TakePayload; onFinished: (result: 
           type="button"
           onClick={confirmSubmit}
           disabled={submitting}
-          className="w-full rounded-sm py-2.5 text-sm font-semibold border-2 border-[oklch(50%_0.24_345)] text-slate-800 hover:bg-slate-100 disabled:opacity-50"
+          className="w-full min-h-12 rounded-sm py-2.5 text-sm font-semibold border-2 border-[oklch(50%_0.24_345)] sm:min-h-0 text-slate-800 hover:bg-slate-100 disabled:opacity-50"
         >
           {submitting ? "กำลังส่ง..." : `ส่งคำตอบ (ตอบแล้ว ${answered}/${total} ข้อ)`}
         </button>
@@ -499,5 +518,13 @@ function Taking({ data, onFinished }: { data: TakePayload; onFinished: (result: 
       </>
       )}
     </div>
+  );
+}
+
+function Arrow({ back }: { back?: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" className={`size-4 ${back ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M5 12h13M13 6l6 6-6 6" />
+    </svg>
   );
 }
