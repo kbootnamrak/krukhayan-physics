@@ -214,11 +214,36 @@ export default function StudentsPanel({
 
   return (
     <div className="space-y-4">
-      <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-2">
+      <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
         <p className="text-sm text-slate-600">
           อัปโหลดไฟล์ Excel รายชื่อนักเรียนที่ส่งออกจากระบบทะเบียนได้เลย ไม่ต้องแก้ไฟล์
         </p>
-        <ul className="text-xs text-slate-500 list-disc pl-5 space-y-0.5">
+        <input
+          type="file"
+          accept=".xlsx,.xls"
+          onChange={handleFile}
+          disabled={busy}
+          aria-label="เลือกไฟล์ Excel รายชื่อนักเรียน"
+          className="block w-full text-sm text-slate-500 file:mr-3 file:min-h-11 file:rounded-sm file:border-2 file:border-porcelain file:bg-transparent file:px-4 file:font-display file:font-semibold file:text-slate-800 hover:file:bg-slate-100 disabled:opacity-50 sm:file:min-h-9"
+        />
+        {busy && <p className="text-sm text-slate-400">กำลังทำงาน...</p>}
+        {log.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-sm text-slate-700">{log[0]}</p>
+            <ul className="text-xs text-slate-500 space-y-0.5 max-h-40 overflow-y-auto">
+              {log.slice(1).map((l, i) => (
+                <li key={i}>{l}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {/* คำอธิบายรูปแบบไฟล์ยาว — พับไว้เมื่อมีรายชื่อแล้ว มือถือจะได้เห็นรายชื่อเร็วขึ้น */}
+        <details open={roster.length === 0} className="group text-xs text-slate-500">
+          <summary className="cursor-pointer select-none py-2 text-sm text-slate-600 hover:text-slate-800">
+            ไฟล์แบบไหนใช้ได้
+          </summary>
+          <div className="space-y-2 pt-1">
+        <ul className="list-disc pl-5 space-y-0.5">
           <li>
             ต้องมี <b>รหัสนักเรียน</b> และชื่อ — จะเป็น <b>คำนำหน้า / ชื่อ / นามสกุล</b> แยกคอลัมน์ หรือ <b>ชื่อ-สกุล</b> คอลัมน์เดียวก็ได้
           </li>
@@ -229,25 +254,13 @@ export default function StudentsPanel({
             ถ้ามี <b>สถานะนักเรียน</b> จะนำเข้าเฉพาะคนที่สถานะ &quot;เรียน&quot; (ลาออก ย้าย ฯลฯ จะถูกข้าม)
           </li>
         </ul>
-        <p className="text-xs text-slate-500">
+        <p>
           ไม่ต้องใส่อีเมล — ระบบจับคู่จากรหัสนักเรียนกับบัญชี Google ของโรงเรียน
-          (<code>รหัสนักเรียน@{SCHOOL_EMAIL_DOMAIN}</code>) ให้อัตโนมัติตอนนักเรียนเข้าระบบครั้งแรก
+          (<code className="break-all">รหัสนักเรียน@{SCHOOL_EMAIL_DOMAIN}</code>) ให้อัตโนมัติตอนนักเรียนเข้าระบบครั้งแรก
         </p>
-        <p className="text-xs text-slate-500">
-          ชื่อในไฟล์สะกดผิด? แก้ในไฟล์แล้วนำเข้าซ้ำได้เลย ระบบจะอัปเดตชื่อให้ ไม่เพิ่มนักเรียนซ้ำ
-        </p>
-        <input type="file" accept=".xlsx,.xls" onChange={handleFile} disabled={busy} className="text-sm" />
-        {busy && <p className="text-sm text-slate-400">กำลังทำงาน...</p>}
-        {log.length > 0 && (
-          <div className="mt-2 space-y-1">
-            <p className="text-sm text-slate-700">{log[0]}</p>
-            <ul className="text-xs text-slate-500 space-y-0.5 max-h-40 overflow-y-auto">
-              {log.slice(1).map((l, i) => (
-                <li key={i}>{l}</li>
-              ))}
-            </ul>
+        <p>ชื่อในไฟล์สะกดผิด? แก้ในไฟล์แล้วนำเข้าซ้ำได้เลย ระบบจะอัปเดตชื่อให้ ไม่เพิ่มนักเรียนซ้ำ</p>
           </div>
-        )}
+        </details>
       </div>
 
       {error && (
@@ -257,7 +270,7 @@ export default function StudentsPanel({
       )}
 
       {rooms.length > 1 && (
-        <div role="group" aria-label="เลือกห้อง" className="flex flex-wrap gap-1">
+        <div role="group" aria-label="เลือกห้อง" className="flex flex-wrap gap-1.5">
           {[{ name: "", count: roster.length }, ...rooms.map((name) => ({ name, count: roster.filter((r) => r.classroom === name).length }))].map((r) => {
             const on = activeRoom === r.name;
             return (
@@ -266,7 +279,7 @@ export default function StudentsPanel({
                 type="button"
                 aria-pressed={on}
                 onClick={() => setRoom(r.name)}
-                className={`rounded-sm border-2 px-3 py-1.5 text-sm font-display font-semibold ${
+                className={`min-h-11 rounded-sm border-2 px-3 py-1.5 text-sm font-display font-semibold sm:min-h-0 ${
                   on ? "border-porcelain bg-porcelain text-[var(--c-slate-50)]" : "border-slate-300 text-slate-600 hover:border-slate-400 hover:text-slate-800"
                 }`}
               >
@@ -308,18 +321,20 @@ export default function StudentsPanel({
         )}
         {[...shown].sort(compareRoster).map((r) => (
           <div key={r.id}>
-          <div className="p-3 text-sm flex items-center justify-between gap-3">
+          {/* มือถือ: ข้อมูลอยู่บน ปุ่มเรียงแถวล่างเต็มกว้าง (กดง่าย) · จอกว้าง: ปุ่มชิดขวาแถวเดียวกัน */}
+          <div className="p-3 text-sm flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
             <div className="min-w-0">
-              <p className="text-slate-700">{r.full_name}</p>
+              <p className="text-base text-slate-700 sm:text-sm">{r.full_name}</p>
               <p className="text-xs text-slate-400">
-                {r.student_code}
+                <span className="font-num tnum">{r.student_code}</span>
                 {placeLabel(r) && <span> · {placeLabel(r)}</span>}
               </p>
               {r.claimed_by && devicesOf(r.claimed_by).length > 0 && (
                 <button
                   type="button"
+                  aria-expanded={openDevices === r.id}
                   onClick={() => setOpenDevices(openDevices === r.id ? null : r.id)}
-                  className="text-xs text-slate-500 hover:text-slate-800 underline-offset-2 hover:underline"
+                  className="-my-1 py-2 text-left text-xs text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-800 sm:my-0 sm:py-0 sm:no-underline sm:hover:underline"
                 >
                   {devicesOf(r.claimed_by)[0].label}
                   {devicesOf(r.claimed_by).length > 1 && ` + อีก ${devicesOf(r.claimed_by).length - 1} เครื่อง`}
@@ -329,22 +344,24 @@ export default function StudentsPanel({
                 <p className="text-xs font-semibold text-amber-700">เครื่องเดียวกับ: {sharedWith(r.claimed_by).join(", ")}</p>
               )}
             </div>
-            <div className="flex items-center gap-3 shrink-0">
+            <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:flex-nowrap sm:gap-3">
               <span
-                className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${
-                  r.claimed_by
-                    ? "bg-green-50 text-green-800 border border-green-200"
-                    : "bg-slate-50 text-slate-500 border border-slate-200"
+                className={`inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full whitespace-nowrap border ${
+                  r.claimed_by ? "bg-green-50 text-green-800 border-green-200" : "bg-slate-50 text-slate-500 border-slate-200"
                 }`}
               >
-                {pinRosterIds.has(r.id) ? "● เข้าด้วย PIN" : r.claimed_by ? "● เข้าระบบแล้ว" : "○ ยังไม่เคยเข้า"}
+                <span
+                  aria-hidden
+                  className={`size-1.5 rounded-full ${r.claimed_by ? "bg-green-600" : "border border-slate-400"}`}
+                />
+                {pinRosterIds.has(r.id) ? "เข้าด้วย PIN" : r.claimed_by ? "เข้าระบบแล้ว" : "ยังไม่เคยเข้า"}
               </span>
               {/* PIN: สร้างให้คนที่ยังไม่เคยเข้า หรือเปลี่ยน/ยกเลิกของคนที่ใช้ PIN อยู่ (คนที่เข้าด้วย Google แล้วไม่ต้องใช้) */}
               {(!r.claimed_by || pinRosterIds.has(r.id)) && (
                 <button
                   onClick={() => pinAction(r, "issue")}
                   disabled={busy || pinBusy === r.id}
-                  className="text-xs text-slate-600 border border-slate-300 rounded-sm px-2 py-1 hover:border-slate-500 hover:text-slate-800 disabled:opacity-50 whitespace-nowrap"
+                  className="min-h-11 whitespace-nowrap rounded-sm border border-slate-300 px-3 text-sm text-slate-700 hover:border-slate-500 hover:text-slate-800 disabled:opacity-50 sm:min-h-0 sm:px-2 sm:py-1 sm:text-xs sm:text-slate-600"
                 >
                   {pinBusy === r.id ? "..." : pinRosterIds.has(r.id) ? "PIN ใหม่" : "สร้าง PIN"}
                 </button>
@@ -353,16 +370,17 @@ export default function StudentsPanel({
                 <button
                   onClick={() => pinAction(r, "revoke")}
                   disabled={busy || pinBusy === r.id}
-                  className="text-xs text-slate-500 hover:text-red-700 hover:underline disabled:opacity-50 whitespace-nowrap"
+                  className="min-h-11 whitespace-nowrap px-2 text-sm text-slate-500 hover:text-red-700 hover:underline disabled:opacity-50 sm:min-h-0 sm:px-0 sm:text-xs"
                 >
                   ยกเลิก PIN
                 </button>
               )}
+              {/* มือถือ: แยกไปชิดขวาสุด ห่างจากปุ่ม PIN กันกดพลาด */}
               <button
                 onClick={() => removeStudent(r)}
                 disabled={busy}
                 aria-label={`เอา ${r.full_name} ออกจากวิชา`}
-                className="text-xs text-red-600 hover:text-red-800 hover:underline disabled:opacity-50"
+                className="ml-auto min-h-11 px-2 text-sm text-red-600 hover:text-red-800 hover:underline disabled:opacity-50 sm:ml-0 sm:min-h-0 sm:px-0 sm:text-xs"
               >
                 เอาออก
               </button>
@@ -415,8 +433,12 @@ export default function StudentsPanel({
                 </p>
               </div>
               <p className="text-xs text-amber-800">จด PIN นี้ให้นักเรียนตอนนี้ — ปิดกล่องนี้แล้วดูซ้ำไม่ได้ (ถ้าลืม กด &quot;PIN ใหม่&quot; ได้)</p>
-              <button type="button" onClick={() => setIssued(null)} className="text-sm text-slate-600 underline underline-offset-2">
-                ปิด
+              <button
+                type="button"
+                onClick={() => setIssued(null)}
+                className="min-h-11 w-full rounded-sm border border-slate-300 text-sm text-slate-700 hover:border-slate-500 sm:min-h-0 sm:w-auto sm:border-0 sm:text-slate-600 sm:underline sm:underline-offset-2"
+              >
+                จดแล้ว ปิดกล่องนี้
               </button>
             </div>
           )}

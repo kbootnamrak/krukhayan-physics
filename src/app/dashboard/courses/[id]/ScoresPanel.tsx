@@ -89,6 +89,8 @@ export default function ScoresPanel({
   // พื้นจาง ๆ สีของหน่วยทั้งคอลัมน์ + เส้นคั่นหนาสีของหน่วย — ครูบอกว่าเดิมแยกหน่วยด้วยตายาก
   const groupOf = (c: Column) => groups.find((g) => g.columns.includes(c))!;
   const tint = (color: string, pct: number) => `color-mix(in oklch, ${color} ${pct}%, transparent)`;
+  // หัวตารางติดอยู่ด้านบนตอนเลื่อน (มือถือ) — ต้องทึบ ไม่งั้นเห็นแถวคะแนนลอดใต้หัว
+  const solid = (color: string, pct: number) => `linear-gradient(${tint(color, pct)}, ${tint(color, pct)}), var(--c-white)`;
   const cellStyle = (c: Column): React.CSSProperties => {
     const g = groupOf(c);
     return {
@@ -219,17 +221,27 @@ export default function ScoresPanel({
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-4 flex-wrap text-xs">
         <p className="text-slate-500">
-          กด <kbd className="px-1 border border-slate-300 rounded">Enter</kbd> เพื่อบันทึกแล้วลงไปคนถัดไป · ช่องว่าง = ยังไม่ได้ให้คะแนน (ไม่ใช่ 0)
+          {/* มือถือไม่มีปุ่ม Enter บนแป้นตัวเลข — ใช้ปุ่ม "ถัดไป" ของแป้นพิมพ์แทน */}
+          <span className="hidden sm:inline">
+            กด <kbd className="px-1 border border-slate-300 rounded">Enter</kbd> เพื่อบันทึกแล้วลงไปคนถัดไป ·{" "}
+          </span>
+          <span className="sm:hidden">กดปุ่มถัดไปบนแป้นพิมพ์เพื่อลงไปคนถัดไป · </span>
+          ช่องว่าง = ยังไม่ได้ให้คะแนน (ไม่ใช่ 0)
         </p>
-        <div className="flex items-center gap-4">
-          <p className={pending > 0 ? "text-slate-500" : "text-green-700"} aria-live="polite">
-            {pending > 0 ? "กำลังบันทึก..." : "✓ บันทึกแล้วทั้งหมด"}
+        <div className="flex w-full items-center justify-between gap-4 sm:w-auto sm:justify-end">
+          <p className={`inline-flex items-center gap-1 ${pending > 0 ? "text-slate-500" : "text-green-700"}`} aria-live="polite">
+            {pending === 0 && (
+              <svg viewBox="0 0 16 16" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="m3 8.5 3 3 7-7" />
+              </svg>
+            )}
+            {pending > 0 ? "กำลังบันทึก..." : "บันทึกแล้วทั้งหมด"}
           </p>
           <button
             onClick={exportExcel}
             disabled={exporting || pending > 0}
             title={pending > 0 ? "รอบันทึกให้เสร็จก่อน" : undefined}
-            className="text-sm border border-slate-300 rounded-md px-3 py-1.5 text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            className="min-h-11 text-sm border border-slate-300 rounded-md px-3 py-1.5 text-slate-700 hover:bg-slate-50 disabled:opacity-50 sm:min-h-0"
           >
             {exporting ? "กำลังสร้างไฟล์..." : `ดาวน์โหลด Excel${activeRoom ? ` (${activeRoom})` : ""}`}
           </button>
@@ -239,7 +251,7 @@ export default function ScoresPanel({
       {/* แถบกรองห้อง + ค้นหา */}
       <div className="flex flex-wrap items-center gap-2">
         {rooms.length > 1 && (
-          <div role="group" aria-label="เลือกห้อง" className="flex flex-wrap gap-1">
+          <div role="group" aria-label="เลือกห้อง" className="flex flex-wrap gap-1.5">
             {[{ name: "", count: students.length }, ...rooms].map((r) => {
               const on = activeRoom === r.name;
               return (
@@ -248,7 +260,7 @@ export default function ScoresPanel({
                   type="button"
                   aria-pressed={on}
                   onClick={() => setRoom(r.name)}
-                  className={`rounded-sm border-2 px-3 py-1.5 text-sm font-display font-semibold ${
+                  className={`min-h-11 rounded-sm border-2 px-3 py-1.5 text-sm font-display font-semibold sm:min-h-0 ${
                     on ? "border-porcelain bg-porcelain text-[var(--c-slate-50)]" : "border-slate-300 text-slate-600 hover:border-slate-400 hover:text-slate-800"
                   }`}
                 >
@@ -277,7 +289,9 @@ export default function ScoresPanel({
             }}
             placeholder="ค้นหาชื่อ รหัส หรือเลขที่"
             aria-label="ค้นหานักเรียน"
-            className="w-full rounded-sm border border-slate-300 bg-white py-1.5 pl-8 pr-3 text-sm placeholder:text-slate-400"
+            enterKeyHint="go"
+            // ตัวอักษร 16px บนมือถือ — เล็กกว่านี้ iPhone จะซูมหน้าเองตอนแตะช่อง
+            className="w-full rounded-sm border border-slate-300 bg-white py-2.5 pl-8 pr-3 text-base placeholder:text-slate-400 sm:py-1.5 sm:text-sm"
           />
         </div>
       </div>
@@ -298,20 +312,21 @@ export default function ScoresPanel({
         </div>
       )}
 
-      <div className="overflow-x-auto bg-white border border-slate-200 rounded-lg">
+      {/* มือถือ: ตารางสูงไม่เกินจอ เลื่อนในกรอบ หัวหน่วย/K P A ติดอยู่ด้านบนเสมอ รู้ตลอดว่ากำลังกรอกช่องไหน */}
+      <div className="max-h-[75dvh] overflow-auto overscroll-contain bg-white border border-slate-200 rounded-lg sm:max-h-none">
         <table className="text-sm border-collapse w-full">
           <thead>
             <tr className="text-left text-slate-500">
-              <th rowSpan={2} className="p-2 sticky left-0 bg-white min-w-[180px] align-bottom">
+              <th rowSpan={2} className="p-2 sticky left-0 top-0 z-30 bg-white min-w-[120px] align-bottom sm:min-w-[180px]">
                 นักเรียน
               </th>
               {groups.map((g) => (
                 <th
                   key={g.title}
                   colSpan={g.columns.length}
-                  className="px-2 pt-2 pb-1.5 text-center font-display font-semibold text-slate-800"
+                  className="sticky top-0 z-20 h-10 px-2 pt-2 pb-1.5 text-center font-display font-semibold text-slate-800 whitespace-nowrap"
                   style={{
-                    background: tint(g.color, 16),
+                    background: solid(g.color, 16),
                     borderLeft: `2px solid ${tint(g.color, 70)}`,
                     borderTop: `4px solid ${g.color}`,
                   }}
@@ -326,16 +341,20 @@ export default function ScoresPanel({
                   </span>
                 </th>
               ))}
-              <th rowSpan={2} className="p-2 text-center border-l border-slate-200 align-bottom">
+              <th rowSpan={2} className="sticky top-0 z-20 bg-white p-2 text-center border-l border-slate-200 align-bottom">
                 รวม
               </th>
-              <th rowSpan={2} className="p-2 text-center align-bottom">
+              <th rowSpan={2} className="sticky top-0 z-20 bg-white p-2 text-center align-bottom">
                 เกรด
               </th>
             </tr>
             <tr className="text-slate-400 text-xs">
               {columns.map((c) => (
-                <th key={c.sourceId} className="p-1 text-center font-normal" style={cellStyle(c)}>
+                <th
+                  key={c.sourceId}
+                  className="sticky top-10 z-20 p-1 text-center font-normal"
+                  style={{ ...cellStyle(c), background: solid(groupOf(c).color, 7) }}
+                >
                   {c.label}
                   <span className="block text-slate-300">/{fmt(c.max)}</span>
                 </th>
@@ -355,14 +374,20 @@ export default function ScoresPanel({
               const summary = summarize(items, lookup);
               return (
                 <tr key={en.id} className="border-t border-slate-100">
-                  <td className="p-2 sticky left-0 bg-white">
+                  <td className="p-2 sticky left-0 z-10 bg-white leading-snug">
                     {en.full_name}
-                    <span className="text-slate-400 ml-1 text-xs">{en.student_code}</span>
-                    {!en.signedIn && (
-                      <span className="ml-1 text-slate-300 text-xs" title="ยังไม่เคยเข้าระบบ — กรอกคะแนนได้ นักเรียนจะเห็นหลังเข้าระบบ">
-                        ○
-                      </span>
-                    )}
+                    {/* มือถือ: รหัสขึ้นบรรทัดใหม่ คอลัมน์ชื่อจะได้แคบ เหลือที่ให้ช่องคะแนน */}
+                    <span className="block text-slate-400 text-xs font-num tnum sm:inline sm:ml-1">
+                      {en.student_code}
+                      {!en.signedIn && (
+                        <span
+                          role="img"
+                          aria-label="ยังไม่เคยเข้าระบบ"
+                          title="ยังไม่เคยเข้าระบบ — กรอกคะแนนได้ นักเรียนจะเห็นหลังเข้าระบบ"
+                          className="ml-1.5 inline-block size-1.5 rounded-full border border-slate-400 align-middle"
+                        />
+                      )}
+                    </span>
                     {placeLabel(en) && <span className="block text-slate-400 text-xs">{placeLabel(en)}</span>}
                   </td>
                   {columns.map((c, col) => (
@@ -497,6 +522,7 @@ function ScoreCell({
     <input
       type="text"
       inputMode="decimal"
+      enterKeyHint="next"
       data-cell={`${row}-${col}`}
       defaultValue={initial ?? ""}
       aria-label={`คะแนน ${column.label} เต็ม ${fmt(column.max)}`}
@@ -514,7 +540,8 @@ function ScoreCell({
           e.currentTarget.blur();
         }
       }}
-      className={`w-14 border rounded px-1 py-0.5 text-sm text-center ${style}`}
+      // มือถือ: ช่องสูง 40px และตัวอักษร 16px (iPhone ไม่ซูมหน้าเองตอนแตะ)
+      className={`h-10 w-14 border rounded px-1 text-base text-center sm:h-auto sm:py-0.5 sm:text-sm ${style}`}
     />
   );
 }
