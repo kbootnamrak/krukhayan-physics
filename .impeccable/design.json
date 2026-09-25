@@ -1,0 +1,168 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-25T00:00:00Z",
+  "title": "Design System: KruKhayan Physics",
+  "extensions": {
+    "themes": {
+      "default": "dark",
+      "selector": ":root (dark) / :root[data-theme=\"light\"] (light)",
+      "persistence": "localStorage 'theme', applied by a beforeInteractive script in layout.tsx before first paint",
+      "mechanism": "globals.css rebinds Tailwind slate-50..900, white, red, green, amber and blue-700 to --c-* variables in @theme inline; each --c-* is defined once per theme. In dark, slate is inverted (slate-50 = ground, slate-800 = porcelain ink, white = raised enamel)."
+    },
+    "colorMeta": {
+      "enamel": { "role": "neutral", "displayName": "Midnight Enamel", "cssVar": "--c-slate-50", "tailwind": "slate-50", "canonical": "oklch(19.5% 0.06 268)", "light": "oklch(97.6% 0.006 268)", "tonalRamp": ["oklch(15% 0.06 268)", "oklch(19.5% 0.06 268)", "oklch(30% 0.06 268)", "oklch(42% 0.06 268)", "oklch(55% 0.06 268)", "oklch(68% 0.05 268)", "oklch(82% 0.03 268)", "oklch(95% 0.01 268)"] },
+      "enamel-raised": { "role": "neutral", "displayName": "Raised Enamel", "cssVar": "--c-white", "tailwind": "white", "canonical": "oklch(23.5% 0.064 268)", "light": "oklch(100% 0 0)", "tonalRamp": ["oklch(15% 0.064 268)", "oklch(23.5% 0.064 268)", "oklch(34% 0.06 268)", "oklch(46% 0.06 268)", "oklch(58% 0.055 268)", "oklch(70% 0.045 268)", "oklch(83% 0.03 268)", "oklch(95% 0.01 268)"] },
+      "enamel-tint": { "role": "neutral", "displayName": "Enamel Tint", "cssVar": "--c-slate-100", "tailwind": "slate-100", "canonical": "oklch(27% 0.064 268)", "light": "oklch(95.8% 0.009 268)", "tonalRamp": ["oklch(15% 0.064 268)", "oklch(27% 0.064 268)", "oklch(38% 0.06 268)", "oklch(50% 0.055 268)", "oklch(62% 0.05 268)", "oklch(74% 0.04 268)", "oklch(85% 0.025 268)", "oklch(95% 0.01 268)"] },
+      "divider": { "role": "neutral", "displayName": "Hairline", "cssVar": "--c-slate-200", "tailwind": "slate-200", "canonical": "oklch(32.5% 0.064 268)", "light": "oklch(91.5% 0.015 268)", "tonalRamp": ["oklch(15% 0.064 268)", "oklch(25% 0.064 268)", "oklch(32.5% 0.064 268)", "oklch(45% 0.06 268)", "oklch(58% 0.05 268)", "oklch(70% 0.04 268)", "oklch(83% 0.025 268)", "oklch(95% 0.01 268)"] },
+      "rule-strong": { "role": "neutral", "displayName": "Strong Rule", "cssVar": "--c-slate-300", "tailwind": "slate-300", "canonical": "oklch(41% 0.062 268)", "light": "oklch(85.5% 0.024 268)", "tonalRamp": ["oklch(15% 0.06 268)", "oklch(27% 0.062 268)", "oklch(41% 0.062 268)", "oklch(52% 0.055 268)", "oklch(63% 0.05 268)", "oklch(74% 0.04 268)", "oklch(85% 0.025 268)", "oklch(95% 0.01 268)"] },
+      "ink-faint": { "role": "neutral", "displayName": "Faint Ink", "cssVar": "--c-slate-400", "tailwind": "slate-400", "canonical": "oklch(70% 0.045 268)", "light": "oklch(62% 0.04 268)", "tonalRamp": ["oklch(15% 0.045 268)", "oklch(27% 0.045 268)", "oklch(39% 0.045 268)", "oklch(51% 0.045 268)", "oklch(62% 0.045 268)", "oklch(70% 0.045 268)", "oklch(83% 0.03 268)", "oklch(95% 0.01 268)"] },
+      "ink-muted": { "role": "neutral", "displayName": "Muted Ink", "cssVar": "--c-slate-500", "tailwind": "slate-500", "canonical": "oklch(75% 0.034 268)", "light": "oklch(52% 0.046 268)", "tonalRamp": ["oklch(15% 0.034 268)", "oklch(27% 0.034 268)", "oklch(39% 0.034 268)", "oklch(51% 0.034 268)", "oklch(63% 0.034 268)", "oklch(75% 0.034 268)", "oklch(85% 0.02 268)", "oklch(95% 0.01 268)"] },
+      "ink-soft": { "role": "neutral", "displayName": "Soft Ink", "cssVar": "--c-slate-600", "tailwind": "slate-600", "canonical": "oklch(82% 0.028 268)", "light": "oklch(44% 0.045 268)", "tonalRamp": ["oklch(15% 0.028 268)", "oklch(27% 0.028 268)", "oklch(39% 0.028 268)", "oklch(51% 0.028 268)", "oklch(63% 0.028 268)", "oklch(73% 0.028 268)", "oklch(82% 0.028 268)", "oklch(95% 0.01 268)"] },
+      "ink-body": { "role": "neutral", "displayName": "Body Ink", "cssVar": "--c-slate-700", "tailwind": "slate-700", "canonical": "oklch(89.5% 0.018 268)", "light": "oklch(36% 0.046 268)", "tonalRamp": ["oklch(15% 0.018 268)", "oklch(27% 0.018 268)", "oklch(39% 0.018 268)", "oklch(51% 0.018 268)", "oklch(63% 0.018 268)", "oklch(75% 0.018 268)", "oklch(89.5% 0.018 268)", "oklch(96% 0.008 268)"] },
+      "ink-primary": { "role": "neutral", "displayName": "Porcelain Ink", "cssVar": "--c-slate-800", "tailwind": "slate-800", "canonical": "oklch(95.5% 0.01 268)", "light": "oklch(25% 0.05 268)", "tonalRamp": ["oklch(15% 0.01 268)", "oklch(27% 0.01 268)", "oklch(39% 0.01 268)", "oklch(51% 0.01 268)", "oklch(63% 0.01 268)", "oklch(75% 0.01 268)", "oklch(87% 0.01 268)", "oklch(95.5% 0.01 268)"] },
+      "ink-bright": { "role": "neutral", "displayName": "Bright Ink", "cssVar": "--c-slate-900", "tailwind": "slate-900", "canonical": "oklch(98% 0.005 268)", "light": "oklch(19% 0.045 268)", "tonalRamp": ["oklch(15% 0.005 268)", "oklch(27% 0.005 268)", "oklch(39% 0.005 268)", "oklch(51% 0.005 268)", "oklch(63% 0.005 268)", "oklch(75% 0.005 268)", "oklch(87% 0.005 268)", "oklch(98% 0.005 268)"] },
+      "porcelain": { "role": "neutral", "displayName": "Porcelain", "cssVar": "--porcelain", "tailwind": "porcelain", "canonical": "oklch(96% 0.01 268)", "light": "oklch(25% 0.05 268)", "tonalRamp": ["oklch(15% 0.01 268)", "oklch(27% 0.01 268)", "oklch(39% 0.01 268)", "oklch(51% 0.01 268)", "oklch(63% 0.01 268)", "oklch(75% 0.01 268)", "oklch(87% 0.01 268)", "oklch(96% 0.01 268)"] },
+      "sign-ink": { "role": "neutral", "displayName": "Sign Ink", "cssVar": "--sign-ink", "canonical": "oklch(18% 0.03 268)", "light": "oklch(18% 0.03 268)", "tonalRamp": ["oklch(15% 0.03 268)", "oklch(18% 0.03 268)", "oklch(30% 0.03 268)", "oklch(42% 0.03 268)", "oklch(55% 0.03 268)", "oklch(68% 0.025 268)", "oklch(82% 0.015 268)", "oklch(95% 0.005 268)"] },
+      "line-scarlet": { "role": "primary", "displayName": "Scarlet Line", "cssVar": "--line-scarlet", "tailwind": "line-scarlet", "canonical": "oklch(64% 0.215 27)", "light": "oklch(56% 0.215 27)", "tonalRamp": ["oklch(15% 0.06 27)", "oklch(27% 0.11 27)", "oklch(39% 0.16 27)", "oklch(51% 0.2 27)", "oklch(64% 0.215 27)", "oklch(74% 0.16 27)", "oklch(85% 0.09 27)", "oklch(95% 0.03 27)"] },
+      "line-cobalt": { "role": "primary", "displayName": "Cobalt Line", "cssVar": "--line-cobalt", "tailwind": "line-cobalt", "canonical": "oklch(63% 0.19 262)", "light": "oklch(50% 0.2 262)", "tonalRamp": ["oklch(15% 0.06 262)", "oklch(27% 0.11 262)", "oklch(39% 0.16 262)", "oklch(51% 0.19 262)", "oklch(63% 0.19 262)", "oklch(74% 0.14 262)", "oklch(85% 0.08 262)", "oklch(95% 0.025 262)"] },
+      "line-amber": { "role": "primary", "displayName": "Amber Line", "cssVar": "--line-amber", "tailwind": "line-amber", "canonical": "oklch(83% 0.165 80)", "light": "oklch(74% 0.165 72)", "tonalRamp": ["oklch(15% 0.04 80)", "oklch(27% 0.07 80)", "oklch(39% 0.1 80)", "oklch(51% 0.13 80)", "oklch(63% 0.15 80)", "oklch(74% 0.165 80)", "oklch(83% 0.165 80)", "oklch(95% 0.05 80)"] },
+      "line-green": { "role": "primary", "displayName": "Signal Green Line", "cssVar": "--line-green", "tailwind": "line-green", "canonical": "oklch(71% 0.175 150)", "light": "oklch(57% 0.16 150)", "tonalRamp": ["oklch(15% 0.05 150)", "oklch(27% 0.09 150)", "oklch(39% 0.12 150)", "oklch(51% 0.15 150)", "oklch(62% 0.17 150)", "oklch(71% 0.175 150)", "oklch(84% 0.1 150)", "oklch(95% 0.03 150)"] },
+      "status-danger": { "role": "status", "displayName": "Out-of-Reach Red", "cssVar": "--c-red-700", "tailwind": "red-700", "canonical": "oklch(77% 0.14 25)", "light": "oklch(50.5% 0.213 27.518)", "tonalRamp": ["oklch(24% 0.06 20)", "oklch(34% 0.09 20)", "oklch(43% 0.12 22)", "oklch(66% 0.2 25)", "oklch(71% 0.18 25)", "oklch(77% 0.14 25)", "oklch(86% 0.08 20)", "oklch(95% 0.03 20)"] },
+      "status-danger-rule": { "role": "status", "displayName": "Out-of-Reach Ring", "cssVar": "--c-red-600", "tailwind": "red-600", "canonical": "oklch(71% 0.18 25)", "light": "oklch(57.7% 0.245 27.325)", "tonalRamp": ["oklch(24% 0.06 20)", "oklch(34% 0.09 20)", "oklch(43% 0.12 22)", "oklch(66% 0.2 25)", "oklch(71% 0.18 25)", "oklch(77% 0.14 25)", "oklch(86% 0.08 20)", "oklch(95% 0.03 20)"] },
+      "status-ok": { "role": "status", "displayName": "Reached Green", "cssVar": "--c-green-700", "tailwind": "green-700", "canonical": "oklch(81% 0.13 150)", "light": "oklch(52.7% 0.154 150.069)", "tonalRamp": ["oklch(24% 0.05 155)", "oklch(34% 0.08 155)", "oklch(43% 0.1 155)", "oklch(70% 0.17 150)", "oklch(75% 0.16 150)", "oklch(81% 0.13 150)", "oklch(89% 0.08 152)", "oklch(96% 0.03 152)"] },
+      "status-ok-rule": { "role": "status", "displayName": "Reached Ring", "cssVar": "--c-green-600", "tailwind": "green-600", "canonical": "oklch(75% 0.16 150)", "light": "oklch(62.7% 0.194 149.214)", "tonalRamp": ["oklch(24% 0.05 155)", "oklch(34% 0.08 155)", "oklch(43% 0.1 155)", "oklch(70% 0.17 150)", "oklch(75% 0.16 150)", "oklch(81% 0.13 150)", "oklch(89% 0.08 152)", "oklch(96% 0.03 152)"] },
+      "status-pending": { "role": "status", "displayName": "Pending Amber", "cssVar": "--c-amber-700", "tailwind": "amber-700", "canonical": "oklch(84% 0.13 72)", "light": "oklch(55.5% 0.163 48.998)", "tonalRamp": ["oklch(25% 0.05 80)", "oklch(36% 0.08 80)", "oklch(46% 0.1 80)", "oklch(79% 0.16 72)", "oklch(83% 0.16 84)", "oklch(84% 0.13 72)", "oklch(89% 0.09 78)", "oklch(93% 0.06 85)"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Course name as a line sign in a 2px porcelain frame." },
+      "figure-hero": { "displayName": "Figure Hero", "purpose": "The 'ต้องได้อีก' points-needed readout; the largest number on the page." },
+      "figure-board": { "displayName": "Figure Board", "purpose": "Points earned on the departure board; secondary board figures at 1.5rem." },
+      "figure-station": { "displayName": "Figure Station", "purpose": "Per-station score, right-aligned, with muted '/ max'." },
+      "title": { "displayName": "Title", "purpose": "Departure-board heading." },
+      "body": { "displayName": "Body", "purpose": "Station names, forecast headlines, terminus captions (Thai)." },
+      "body-sm": { "displayName": "Body Small", "purpose": "Tabs, hints, row labels, forecast detail." },
+      "label-code": { "displayName": "Label Code", "purpose": "K / P / A category code before the Thai category name." },
+      "wordmark": { "displayName": "Wordmark", "purpose": "Uppercase 'KruKhayan Physics' in the header only." }
+    },
+    "shadows": [
+      { "name": "route-glow", "value": "drop-shadow(0 0 6px color-mix(in oklch, currentColor calc(var(--glow-strength) * 100%), transparent))", "purpose": "Neon bleed on graded rail segments and filled station discs only; --glow-strength 0.55 dark, 0 light. Applied as filter, not box-shadow." }
+    ],
+    "focus": [
+      { "name": "focus-ring", "value": "outline: 2px solid var(--line-amber); outline-offset: 2px", "purpose": "Global :focus-visible; light theme swaps outline-color to var(--line-cobalt)." },
+      { "name": "caret", "value": "caret-color: var(--line-amber)", "purpose": "Inputs, selects, textareas." },
+      { "name": "selection", "value": "background: color-mix(in oklch, var(--line-cobalt) 45%, transparent); color: var(--c-slate-900)", "purpose": "Text selection wash." }
+    ],
+    "motion": [
+      { "name": "rail-reveal", "value": "1100ms cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Enamel cover over the rail column scales Y 1 -> 0 from the bottom origin, once on load; disabled under prefers-reduced-motion; resting state leaves the rail visible." },
+      { "name": "chip-color", "value": "transition-colors 150ms", "purpose": "Terminus chip fill/ring changes when a target is chosen. Score figures never animate." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px", "purpose": "Page padding 16 -> 24px; header shows display name." },
+      { "name": "lg", "value": "1024px", "purpose": "Student route becomes strip map left + 22rem sticky departure board right." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Filled porcelain-ink action (bg-slate-800 text-white through the remap); inverts to navy on light.",
+      "html": "<button class=\"ds-btn-primary\">บันทึก</button>",
+      "css": ".ds-btn-primary { background: var(--c-slate-800); color: var(--c-white); border: none; border-radius: 6px; padding: 8px 16px; font-family: var(--font-anuphan), system-ui, sans-serif; font-size: 0.875rem; cursor: pointer; } .ds-btn-primary:hover { background: var(--c-slate-900); } .ds-btn-primary:focus-visible { outline: 2px solid var(--line-amber); outline-offset: 2px; } .ds-btn-primary:disabled { opacity: 0.5; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Header utility button (sign-out, theme toggle).",
+      "html": "<button class=\"ds-btn-outline\">ออกจากระบบ</button>",
+      "css": ".ds-btn-outline { height: 36px; padding: 0 12px; background: transparent; color: var(--c-slate-600); border: 1px solid var(--c-slate-300); border-radius: 6px; font-family: var(--font-anuphan), system-ui, sans-serif; font-size: 0.875rem; cursor: pointer; } .ds-btn-outline:hover { color: var(--c-slate-800); border-color: var(--c-slate-400); } .ds-btn-outline:focus-visible { outline: 2px solid var(--line-amber); outline-offset: 2px; }"
+    },
+    {
+      "name": "Tabs",
+      "kind": "nav",
+      "refersTo": "tab-active",
+      "description": "Course tabs; active tab carries a 3px Scarlet Line underline.",
+      "html": "<div class=\"ds-tabs\" role=\"tablist\"><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\">สื่อการสอน</button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"true\">คะแนนของฉัน</button></div>",
+      "css": ".ds-tabs { display: flex; border-bottom: 1px solid var(--c-slate-200); overflow-x: auto; } .ds-tab { margin-bottom: -1px; padding: 10px 16px; background: none; border: none; border-bottom: 3px solid transparent; color: var(--c-slate-500); font-family: var(--font-anuphan), system-ui, sans-serif; font-size: 0.875rem; white-space: nowrap; cursor: pointer; } .ds-tab:hover { color: var(--c-slate-700); } .ds-tab[aria-selected=\"true\"] { border-bottom-color: var(--line-scarlet); color: var(--c-slate-800); font-weight: 500; } .ds-tab:focus-visible { outline: 2px solid var(--line-amber); outline-offset: 2px; }"
+    },
+    {
+      "name": "Line Sign",
+      "kind": "chip",
+      "refersTo": "line-sign",
+      "description": "Unit title badge filled with its line ink; amber carries Sign Ink.",
+      "html": "<span class=\"ds-line-sign\">หน่วยที่ 1 ไฟฟ้าสถิต</span> <span class=\"ds-line-sign ds-line-sign--amber\">หน่วยที่ 3 แม่เหล็กและไฟฟ้า</span>",
+      "css": ".ds-line-sign { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 6px; background: var(--line-scarlet); color: #fff; font-family: var(--font-anuphan), system-ui, sans-serif; font-size: 0.875rem; font-weight: 600; line-height: 1.375; } .ds-line-sign--amber { background: var(--line-amber); color: var(--sign-ink); }"
+    },
+    {
+      "name": "Course Sign",
+      "kind": "custom",
+      "refersTo": "course-sign",
+      "description": "Course name framed in a 2px porcelain border, set in signage type.",
+      "html": "<h1 class=\"ds-course-sign\"><span class=\"ds-course-sign__name\">ฟิสิกส์ 5</span><span class=\"ds-course-sign__term\">ปีการศึกษา 2569 เทอม 1</span></h1>",
+      "css": ".ds-course-sign { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 0; } .ds-course-sign__name { border: 2px solid var(--porcelain); border-radius: 6px; padding: 2px 12px; font-family: var(--font-barlow), var(--font-anuphan), system-ui, sans-serif; font-size: 1.875rem; font-weight: 600; line-height: 1.25; color: var(--c-slate-800); } .ds-course-sign__term { font-family: var(--font-anuphan), system-ui, sans-serif; font-size: 1rem; font-weight: 400; color: var(--c-slate-500); }"
+    },
+    {
+      "name": "Terminus Chips",
+      "kind": "chip",
+      "refersTo": "terminus-chip-selected",
+      "description": "Target-grade selector: stations on a short horizontal rail; selected fills porcelain, unreachable dims.",
+      "html": "<div class=\"ds-termini\"><span class=\"ds-termini__rail\"></span><button class=\"ds-terminus\" aria-pressed=\"true\">4</button><button class=\"ds-terminus\" aria-pressed=\"false\">3.5</button><button class=\"ds-terminus ds-terminus--off\" aria-pressed=\"false\">3</button></div>",
+      "css": ".ds-termini { position: relative; display: flex; justify-content: space-between; gap: 4px; padding: 2px 0; max-width: 200px; } .ds-termini__rail { position: absolute; left: 12px; right: 12px; top: 50%; transform: translateY(-50%); height: 5px; background: var(--c-slate-300); } .ds-terminus { position: relative; width: 40px; height: 40px; border-radius: 9999px; border: 3px solid var(--porcelain); background: var(--c-white); color: var(--c-slate-800); font-family: var(--font-barlow), system-ui, sans-serif; font-variant-numeric: tabular-nums lining-nums; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background-color 150ms, color 150ms, border-color 150ms; } .ds-terminus:hover { background: var(--c-slate-100); } .ds-terminus[aria-pressed=\"true\"] { background: var(--porcelain); color: var(--c-slate-50); } .ds-terminus--off { border-color: var(--c-slate-300); color: var(--c-slate-400); } .ds-terminus--off:hover { background: var(--c-white); border-color: var(--c-slate-400); } .ds-terminus:focus-visible { outline: 2px solid var(--line-amber); outline-offset: 2px; }"
+    },
+    {
+      "name": "Departure Board",
+      "kind": "card",
+      "refersTo": "departure-board",
+      "description": "Readout panel: porcelain-framed raised enamel, map-glyph rows with tabular figures.",
+      "html": "<aside class=\"ds-board\"><h2 class=\"ds-board__title\">ป้ายบอกทางของฉัน</h2><dl class=\"ds-board__rows\"><div class=\"ds-board__row\"><dt><span class=\"ds-glyph ds-glyph--filled\"></span>ได้แล้ว</dt><dd><span class=\"ds-fig-lg\">36</span><span class=\"ds-fig-max\"> / 45</span></dd></div><div class=\"ds-board__row\"><dt><span class=\"ds-glyph\"></span>ยังไม่มีคะแนน</dt><dd><span class=\"ds-fig-md ds-pending\">5</span> ชิ้น</dd></div></dl></aside>",
+      "css": ".ds-board { max-width: 22rem; background: var(--c-white); border: 2px solid var(--porcelain); border-radius: 6px; color: var(--c-slate-800); font-family: var(--font-anuphan), system-ui, sans-serif; } .ds-board__title { margin: 0; padding: 10px 16px; border-bottom: 2px solid var(--porcelain); font-family: var(--font-barlow), var(--font-anuphan), system-ui, sans-serif; font-size: 1.25rem; font-weight: 600; } .ds-board__rows { margin: 0; padding: 0 16px; } .ds-board__row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0; border-top: 1px solid var(--c-slate-200); } .ds-board__row:first-child { border-top: none; } .ds-board__row dt { display: flex; align-items: center; gap: 10px; font-size: 0.875rem; color: var(--c-slate-600); } .ds-board__row dd { margin: 0; text-align: right; } .ds-glyph { width: 14px; height: 14px; border-radius: 9999px; border: 2px solid var(--porcelain); } .ds-glyph--filled { background: var(--line-scarlet); } .ds-fig-lg, .ds-fig-md, .ds-fig-max { font-family: var(--font-barlow), system-ui, sans-serif; font-variant-numeric: tabular-nums lining-nums; } .ds-fig-lg { font-size: 1.875rem; font-weight: 600; line-height: 1; } .ds-fig-md { font-size: 1.5rem; font-weight: 600; line-height: 1; } .ds-fig-max { color: var(--c-slate-500); } .ds-pending { color: var(--c-amber-700); }"
+    },
+    {
+      "name": "Strip Map Station",
+      "kind": "custom",
+      "refersTo": "line-sign",
+      "description": "Signature row: 36px rail cell with a 5px track and station disc (filled + glow when graded, hollow ring when not), name left, tabular score right.",
+      "html": "<ol class=\"ds-map\"><li class=\"ds-stn\"><div class=\"ds-rail\" style=\"--ink: var(--line-cobalt)\"><span class=\"ds-track ds-glow\"></span><span class=\"ds-disc ds-disc--lit ds-glow\"></span></div><div class=\"ds-stn__body\"><p><b class=\"ds-code\">K</b>ความรู้</p><p class=\"ds-score\"><span>7</span><span class=\"ds-fig-max\"> / 10</span></p></div></li><li class=\"ds-stn\"><div class=\"ds-rail\" style=\"--ink: var(--line-cobalt)\"><span class=\"ds-track ds-dim\"></span><span class=\"ds-disc\"></span></div><div class=\"ds-stn__body\"><div><p class=\"ds-muted\"><b class=\"ds-code\">P</b>ทักษะกระบวนการ</p><p class=\"ds-pending-note\">ยังไม่มีคะแนน</p></div><p class=\"ds-score\"><span class=\"ds-dash\">–</span><span class=\"ds-fig-max\"> / 5</span></p></div></li></ol>",
+      "css": ".ds-map { list-style: none; margin: 0; padding: 0; font-family: var(--font-anuphan), system-ui, sans-serif; color: var(--c-slate-800); } .ds-stn { display: flex; align-items: stretch; } .ds-rail { position: relative; width: 36px; flex-shrink: 0; color: var(--ink); } .ds-track { position: absolute; left: 50%; top: 0; bottom: 0; width: 5px; transform: translateX(-50%); background: var(--ink); } .ds-dim { opacity: 0.3; } .ds-glow { filter: drop-shadow(0 0 6px color-mix(in oklch, currentColor calc(var(--glow-strength) * 100%), transparent)); } .ds-disc { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; transform: translate(-50%, -50%); border-radius: 9999px; border: 3px solid var(--porcelain); background: var(--c-slate-50); box-sizing: border-box; } .ds-disc--lit { background: var(--ink); } .ds-stn__body { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0 10px 12px; border-bottom: 1px solid var(--c-slate-200); } .ds-stn:last-child .ds-stn__body { border-bottom: none; } .ds-stn__body p { margin: 0; } .ds-code { font-family: var(--font-barlow), system-ui, sans-serif; font-weight: 600; letter-spacing: 0.025em; margin-right: 6px; } .ds-muted { color: var(--c-slate-600); } .ds-pending-note { font-size: 0.875rem; color: var(--c-amber-700); } .ds-score { font-family: var(--font-barlow), system-ui, sans-serif; font-variant-numeric: tabular-nums lining-nums; white-space: nowrap; text-align: right; } .ds-score > span:first-child { font-size: 1.25rem; font-weight: 600; } .ds-dash { color: var(--c-slate-400); } .ds-fig-max { color: var(--c-slate-500); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Midnight Line Map",
+    "overview": "The term is a rail line the student rides. Every graded piece is a station, each unit is its own coloured line, the exams are interchanges, and the ride ends at the grade the student is aiming for. The site is a transit diagram printed on midnight enamel: porcelain ink for words and station rings, four line inks for the routes, and the stretch the student has already travelled lit a little brighter, with a soft neon bleed. It stands in for the usual summary cards, percentage rings and progress bars, which this system does not use.\n\nDensity is operational. Most students read it on a phone in the evening or between classes, and the teacher enters scores for a 30 to 35 student room at a desk. So the map is calm and the figures do the talking. Scores sit in a condensed transit face with tabular numerals, right-aligned, and they never move. The one piece of motion is the line drawing itself in once when the page loads.\n\nDark is the default and a light theme sits one toggle away in the header. Light is the same map printed on paper: navy ink replaces porcelain, the glow is switched off, and the line inks deepen to hold contrast on white. No glass, no blur, no gradients, in either theme.",
+    "keyCharacteristics": [
+      "Midnight enamel ground (dark default), porcelain ink, and a light paper theme on the same tokens.",
+      "Four line inks (scarlet, cobalt, amber, green) given to units in order. Exams ride porcelain.",
+      "Filled disc = graded, hollow porcelain ring = not yet graded, and both always come with words.",
+      "Barlow Semi Condensed for signage and every figure (tabular, lining); Anuphan for all Thai and UI text.",
+      "Flat surfaces with 2px porcelain sign borders. The only light effect is a neon bleed on graded rails.",
+      "Numbers stay still. The rail draws in once on load."
+    ],
+    "rules": [
+      { "name": "The Inherited Palette Rule", "body": "Tailwind's slate, white, red, green, amber and blue-700 utilities are theme tokens. `globals.css` rebinds each of them (`--color-slate-800: var(--c-slate-800)` and so on) inside `@theme inline`, and defines the values twice: once on `:root` (dark) and once on `:root[data-theme=\"light\"]`. In the dark theme slate is inverted, so slate-50 is the enamel ground, slate-800 is porcelain ink and `white` is raised enamel. Every existing page written with `bg-white`, `text-slate-800` or `border-slate-200` therefore changes theme without edits. Write new UI in those same utility names, or in `line-*` / `porcelain`, and never in raw colour values.", "section": "colors" },
+      { "name": "The Line Ink Rule", "body": "Line inks belong to units, cycling scarlet, cobalt, amber, green in unit order. Exams ride porcelain. A line ink can mark a rail, a line sign, a glyph or the active-tab underline. It never sets body text and never fills a large surface.", "section": "colors" },
+      { "name": "The Amber Carries Dark Ink Rule", "body": "Any text sitting on line-amber uses Sign Ink, in both themes.", "section": "colors" },
+      { "name": "The Transit Figure Rule", "body": "Every score, maximum, count and grade uses `font-sign` plus `.tnum` (tabular and lining numerals), so digits line up in columns. Thai words always stay in Anuphan, even when they sit inside a figure line (for example \"ชิ้น\").", "section": "typography" },
+      { "name": "The Readable Score Rule", "body": "A score is never smaller than 1.25rem and never below ink-primary on its own row. Missing scores show an en dash in ink-faint next to the maximum. They never show a zero.", "section": "typography" },
+      { "name": "The Glow Belongs to the Route Rule", "body": "Neon bleed marks where the student has been, and nowhere else. Cards, buttons, text and hover states do not glow. No glass, no blur, no gradients.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do write colour through the remapped Tailwind names (`bg-white`, `bg-slate-50`, `text-slate-800`, `border-slate-200`, `text-amber-700`) or the `line-*` / `porcelain` utilities, so a surface follows the theme toggle with no extra work.",
+      "Do add any new hue to both the `:root` and `:root[data-theme=\"light\"]` blocks and bind it in `@theme inline`, in OKLCH.",
+      "Do set every number in `font-sign` with `.tnum`, right-aligned, with the maximum in ink-muted after a slash.",
+      "Do pair every station state with words. A hollow ring always comes with \"ยังไม่มีคะแนน\" (no score yet).",
+      "Do assign line inks by unit order (scarlet, cobalt, amber, green, then repeat) and put exams on porcelain.",
+      "Do keep the glow limited to graded rails and station discs, driven by `--glow-strength`.",
+      "Do respect `prefers-reduced-motion`. The rail reveal is the only load animation."
+    ],
+    "donts": [
+      "Don't use glass, blur or gradients.",
+      "Don't animate, count up or re-flow score figures. Numbers never move.",
+      "Don't fall back on summary cards, percentage rings or progress bars for student progress. The line map replaces them.",
+      "Don't hard-code hex or oklch values, or Tailwind's stock palette, in components. They will not follow the theme.",
+      "Don't put light text on amber. Use Sign Ink.",
+      "Don't add steps, animation or layout weight to the teacher's score-entry flow. It must stay as fast as it is now.",
+      "Don't show a grade before every piece is scored. Until then, the terminus is the student's chosen target, labelled as one."
+    ]
+  }
+}

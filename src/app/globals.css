@@ -1,26 +1,226 @@
 @import "tailwindcss";
 
+/*
+ * โลกของเว็บ: แผนที่รถไฟฟ้าบนเคลือบสีกรมท่า (ธีมมืดเป็นค่าเริ่มต้น สลับเป็นสว่างได้ที่แถบบน)
+ *
+ * หน้าเดิมทั้งเว็บเขียนด้วยสี slate/white/red/green/amber ของ Tailwind
+ * จึงผูกสีเหล่านั้นเข้ากับโทเคนชุดนี้ — ทุกหน้าเปลี่ยนธีมตามกันโดยไม่ต้องแก้ทีละไฟล์
+ * ในธีมมืด slate ถูกกลับด้าน: slate-50 = พื้นเคลือบ, slate-800 = ตัวอักษรสีกระเบื้องขาว
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: dark;
+
+  --c-white: oklch(23.5% 0.064 268);
+  --c-slate-50: oklch(19.5% 0.06 268);
+  --c-slate-100: oklch(27% 0.064 268);
+  --c-slate-200: oklch(32.5% 0.064 268);
+  --c-slate-300: oklch(41% 0.062 268);
+  --c-slate-400: oklch(70% 0.045 268);
+  --c-slate-500: oklch(75% 0.034 268);
+  --c-slate-600: oklch(82% 0.028 268);
+  --c-slate-700: oklch(89.5% 0.018 268);
+  --c-slate-800: oklch(95.5% 0.01 268);
+  --c-slate-900: oklch(98% 0.005 268);
+
+  --c-red-50: oklch(24% 0.06 20);
+  --c-red-200: oklch(34% 0.09 20);
+  --c-red-300: oklch(43% 0.12 22);
+  --c-red-500: oklch(66% 0.2 25);
+  --c-red-600: oklch(71% 0.18 25);
+  --c-red-700: oklch(77% 0.14 25);
+  --c-red-800: oklch(86% 0.08 20);
+
+  --c-green-50: oklch(24% 0.05 155);
+  --c-green-200: oklch(34% 0.08 155);
+  --c-green-300: oklch(43% 0.1 155);
+  --c-green-500: oklch(70% 0.17 150);
+  --c-green-600: oklch(75% 0.16 150);
+  --c-green-700: oklch(81% 0.13 150);
+  --c-green-800: oklch(89% 0.08 152);
+
+  --c-amber-50: oklch(25% 0.05 80);
+  --c-amber-200: oklch(36% 0.08 80);
+  --c-amber-300: oklch(46% 0.1 80);
+  --c-amber-400: oklch(83% 0.16 84);
+  --c-amber-500: oklch(79% 0.16 72);
+  --c-amber-700: oklch(84% 0.13 72);
+  --c-amber-800: oklch(89% 0.09 78);
+  --c-amber-900: oklch(93% 0.06 85);
+
+  --c-blue-700: oklch(76% 0.13 262);
+
+  /* หมึกของสายรถไฟ — หน่วยการเรียนแต่ละหน่วยได้สีหนึ่งสาย วนตามลำดับ */
+  --line-scarlet: oklch(64% 0.215 27);
+  --line-cobalt: oklch(63% 0.19 262);
+  --line-amber: oklch(83% 0.165 80);
+  --line-green: oklch(71% 0.175 150);
+  /* วงสถานี สายสอบ และปลายทาง: สีกระเบื้องขาวบนพื้นมืด / สีหมึกกรมท่าบนพื้นสว่าง */
+  --porcelain: oklch(96% 0.01 268);
+  /* ตัวอักษรบนป้ายสีเหลืองอำพัน ต้องเข้มเสมอทั้งสองธีม */
+  --sign-ink: oklch(18% 0.03 268);
+  /* แสงเรืองของเส้นทางที่เลือก — เบากว่าตัวเส้น ไม่แย่งสายตาจากตัวเลข */
+  --glow-strength: 0.55;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --c-white: oklch(100% 0 0);
+  --c-slate-50: oklch(97.6% 0.006 268);
+  --c-slate-100: oklch(95.8% 0.009 268);
+  --c-slate-200: oklch(91.5% 0.015 268);
+  --c-slate-300: oklch(85.5% 0.024 268);
+  --c-slate-400: oklch(62% 0.04 268);
+  --c-slate-500: oklch(52% 0.046 268);
+  --c-slate-600: oklch(44% 0.045 268);
+  --c-slate-700: oklch(36% 0.046 268);
+  --c-slate-800: oklch(25% 0.05 268);
+  --c-slate-900: oklch(19% 0.045 268);
+
+  --c-red-50: oklch(97.1% 0.013 17.38);
+  --c-red-200: oklch(88.5% 0.062 18.334);
+  --c-red-300: oklch(80.8% 0.114 19.571);
+  --c-red-500: oklch(63.7% 0.237 25.331);
+  --c-red-600: oklch(57.7% 0.245 27.325);
+  --c-red-700: oklch(50.5% 0.213 27.518);
+  --c-red-800: oklch(44.4% 0.177 26.899);
+
+  --c-green-50: oklch(98.2% 0.018 155.826);
+  --c-green-200: oklch(92.5% 0.084 155.995);
+  --c-green-300: oklch(87.1% 0.15 154.449);
+  --c-green-500: oklch(72.3% 0.219 149.579);
+  --c-green-600: oklch(62.7% 0.194 149.214);
+  --c-green-700: oklch(52.7% 0.154 150.069);
+  --c-green-800: oklch(44.8% 0.119 151.328);
+
+  --c-amber-50: oklch(98.7% 0.022 95.277);
+  --c-amber-200: oklch(92.4% 0.12 95.746);
+  --c-amber-300: oklch(87.9% 0.169 91.605);
+  --c-amber-400: oklch(82.8% 0.189 84.429);
+  --c-amber-500: oklch(76.9% 0.188 70.08);
+  --c-amber-700: oklch(55.5% 0.163 48.998);
+  --c-amber-800: oklch(47.3% 0.137 46.201);
+  --c-amber-900: oklch(41.4% 0.112 45.904);
+
+  --c-blue-700: oklch(48.8% 0.243 264.376);
+
+  --line-scarlet: oklch(56% 0.215 27);
+  --line-cobalt: oklch(50% 0.2 262);
+  --line-amber: oklch(74% 0.165 72);
+  --line-green: oklch(57% 0.16 150);
+  --porcelain: oklch(25% 0.05 268);
+  --glow-strength: 0;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-white: var(--c-white);
+  --color-slate-50: var(--c-slate-50);
+  --color-slate-100: var(--c-slate-100);
+  --color-slate-200: var(--c-slate-200);
+  --color-slate-300: var(--c-slate-300);
+  --color-slate-400: var(--c-slate-400);
+  --color-slate-500: var(--c-slate-500);
+  --color-slate-600: var(--c-slate-600);
+  --color-slate-700: var(--c-slate-700);
+  --color-slate-800: var(--c-slate-800);
+  --color-slate-900: var(--c-slate-900);
+  --color-red-50: var(--c-red-50);
+  --color-red-200: var(--c-red-200);
+  --color-red-300: var(--c-red-300);
+  --color-red-500: var(--c-red-500);
+  --color-red-600: var(--c-red-600);
+  --color-red-700: var(--c-red-700);
+  --color-red-800: var(--c-red-800);
+  --color-green-50: var(--c-green-50);
+  --color-green-200: var(--c-green-200);
+  --color-green-300: var(--c-green-300);
+  --color-green-500: var(--c-green-500);
+  --color-green-600: var(--c-green-600);
+  --color-green-700: var(--c-green-700);
+  --color-green-800: var(--c-green-800);
+  --color-amber-50: var(--c-amber-50);
+  --color-amber-200: var(--c-amber-200);
+  --color-amber-300: var(--c-amber-300);
+  --color-amber-400: var(--c-amber-400);
+  --color-amber-500: var(--c-amber-500);
+  --color-amber-700: var(--c-amber-700);
+  --color-amber-800: var(--c-amber-800);
+  --color-amber-900: var(--c-amber-900);
+  --color-blue-700: var(--c-blue-700);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-line-scarlet: var(--line-scarlet);
+  --color-line-cobalt: var(--line-cobalt);
+  --color-line-amber: var(--line-amber);
+  --color-line-green: var(--line-green);
+  --color-porcelain: var(--porcelain);
+
+  /* ภาษาไทยใช้ Anuphan · ป้ายและตัวเลขใช้ Barlow Semi Condensed แบบป้ายสถานี */
+  --font-sans: var(--font-anuphan), system-ui, sans-serif;
+  --font-sign: var(--font-barlow), var(--font-anuphan), system-ui, sans-serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--c-slate-50);
+  color: var(--c-slate-800);
+}
+
+::selection {
+  background: color-mix(in oklch, var(--line-cobalt) 45%, transparent);
+  color: var(--c-slate-900);
+}
+
+:focus-visible {
+  outline: 2px solid var(--line-amber);
+  outline-offset: 2px;
+}
+
+input,
+select,
+textarea {
+  caret-color: var(--line-amber);
+}
+
+html {
+  scrollbar-color: var(--c-slate-300) var(--c-slate-50);
+}
+
+/* ตัวเลขในตารางและป้ายคะแนนเรียงหลักตรงกันเสมอ */
+.tnum {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* เส้นทางที่เลือกเรืองแสงแบบหลอดนีออน — ธีมสว่างปิดแสงเอง (--glow-strength: 0) */
+.route-glow {
+  filter: drop-shadow(0 0 6px color-mix(in oklch, currentColor calc(var(--glow-strength) * 100%), transparent));
+}
+
+/*
+ * รางวาดตัวเองครั้งเดียวตอนเปิดหน้า: แผ่นสีพื้นคลุมคอลัมน์รางแล้วหดลงจากบนลงล่าง
+ * สภาพปกติของแผ่นคือหดหมดแล้ว (มองไม่เห็น) — ถ้าเบราว์เซอร์ไม่เล่นแอนิเมชัน รางก็ยังแสดงครบ
+ * ตัวเลขคะแนนไม่ขยับเลย
+ */
+@keyframes rail-reveal {
+  from {
+    transform: scaleY(1);
+  }
+  to {
+    transform: scaleY(0);
+  }
+}
+
+.rail-reveal {
+  transform: scaleY(0);
+  transform-origin: bottom;
+  animation: rail-reveal 1100ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rail-reveal {
+    animation: none;
+  }
+}
+
+/* ธีมสว่าง: วงโฟกัสสีอำพันจางเกินบนพื้นขาว ใช้สีโคบอลต์แทน */
+:root[data-theme="light"] :focus-visible {
+  outline-color: var(--line-cobalt);
 }
