@@ -265,3 +265,56 @@ html {
     animation: none;
   }
 }
+
+/*
+ * ภาพเคลื่อนไหวในภาพตกแต่งฟิสิกส์ (หน้าเข้าสู่ระบบ/หน้าหลัก)
+ * - field-flow: จุดแสงไหลตามเส้นสนามแม่เหล็กจาก N ไป S เหมือนกระแสในสายไฟ
+ * - wave-travel: คลื่นแม่เหล็กไฟฟ้าเคลื่อนที่ไปทางขวา เลื่อนทีละหนึ่งความยาวคลื่นจึงต่อกันเนียน
+ * สภาพปกติ (ไม่เล่นแอนิเมชัน) ยังเห็นเส้นสนามและคลื่นครบ
+ */
+@keyframes field-flow {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+.field-flow {
+  stroke-dasharray: 5 19;
+  animation: field-flow 1.6s linear infinite;
+}
+
+@keyframes wave-travel {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(120px);
+  }
+}
+
+@keyframes wave-travel-100 {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100px);
+  }
+}
+
+.wave-travel {
+  animation: wave-travel 2.4s linear infinite;
+}
+
+.wave-travel-100 {
+  animation-name: wave-travel-100;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .field-flow {
+    animation: none;
+    stroke-dasharray: none;
+  }
+  .wave-travel {
+    animation: none;
+  }
+}
