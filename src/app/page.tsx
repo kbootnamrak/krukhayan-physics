@@ -1,22 +1,18 @@
-import Link from "next/link";
-import AuthHashNotice from "@/app/AuthHashNotice";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 
-export default function Home() {
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-slate-50 px-4">
-      <AuthHashNotice />
-      <div className="text-center space-y-4">
-        <h1 className="text-3xl font-bold text-slate-800">KruKhayan Physics</h1>
-        <p className="text-slate-500">
-          เว็บไซต์จัดการเรียนการสอนวิชาฟิสิกส์
-        </p>
-        <Link
-          href="/login"
-          className="inline-block bg-slate-800 text-white px-5 py-2 rounded-md text-sm"
-        >
-          เข้าสู่ระบบ
-        </Link>
-      </div>
-    </div>
-  );
+/**
+ * หน้าแรกของเว็บไม่มีเนื้อหาของตัวเอง — พาไปหน้าที่ใช้จริงทันที
+ * ล็อกอินแล้วไปหน้าหลัก ยังไม่ล็อกอินไปหน้าเข้าสู่ระบบ (หน้าที่มีภาพฟิสิกส์เต็ม)
+ *
+ * ลิงก์ในอีเมลที่ใช้ไม่ได้จะพากลับมาที่นี่พร้อม #error=... ต่อท้าย
+ * เบราว์เซอร์พาส่วนหลัง # ติดไปกับการ redirect ด้วย หน้า /login จึงยังแสดงข้อความแจ้งได้เหมือนเดิม
+ */
+export default async function Home() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  redirect(user ? "/dashboard" : "/login");
 }
