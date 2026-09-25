@@ -84,6 +84,20 @@ export default function ResultsPanel({
     return { text: "กำลังทำ", cls: "text-trace-cyan" };
   }
 
+  async function setReleased(next: boolean) {
+    const msg = next
+      ? "ประกาศคะแนนให้นักเรียนเห็นเลยไหม?\nนักเรียนที่ส่งแล้วจะเห็นคะแนนของตัวเองทันที (ไม่เห็นเฉลย)"
+      : "ซ่อนคะแนนจากนักเรียนอีกครั้งไหม?";
+    if (!window.confirm(msg)) return;
+    setBusy(true);
+    const { error: e } = await supabase.from("quizzes").update({ scores_released: next }).eq("id", quiz.id);
+    setBusy(false);
+    if (e) return setError(dbErrorMessage(e));
+    setError(null);
+    setNotice(next ? "ประกาศคะแนนแล้ว นักเรียนเห็นคะแนนของตัวเองแล้ว" : "ซ่อนคะแนนแล้ว");
+    onChanged();
+  }
+
   async function regrade() {
     setBusy(true);
     const { data, error: e } = await supabase.rpc("quiz_regrade", { p_quiz: quiz.id });
@@ -138,6 +152,29 @@ export default function ResultsPanel({
 
   return (
     <div className="space-y-3">
+      {/* ประกาศคะแนน: ครูตรวจก่อนแล้วค่อยให้นักเรียนเห็น */}
+      <div
+        className={`flex flex-wrap items-center gap-3 rounded-sm border-2 px-4 py-3 ${
+          quiz.scores_released ? "border-green-300 bg-green-50" : "border-amber-300 bg-amber-50"
+        }`}
+      >
+        <p className={`min-w-0 flex-1 text-sm ${quiz.scores_released ? "text-green-800" : "text-amber-900"}`}>
+          {quiz.scores_released
+            ? "ประกาศคะแนนแล้ว — นักเรียนเห็นคะแนนของตัวเอง (ไม่เห็นเฉลย)"
+            : "ยังไม่ประกาศคะแนน — นักเรียนเห็นแค่ว่าส่งแล้ว ตรวจผลให้เรียบร้อยก่อนแล้วค่อยประกาศ"}
+        </p>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => setReleased(!quiz.scores_released)}
+          className={`rounded-sm px-4 py-2 text-sm font-semibold disabled:opacity-50 ${
+            quiz.scores_released ? "border-2 border-slate-300 text-slate-700 hover:bg-slate-100" : "bg-slate-800 text-white"
+          }`}
+        >
+          {quiz.scores_released ? "ซ่อนคะแนน" : "ประกาศคะแนน"}
+        </button>
+      </div>
+
       <div className="flex flex-wrap items-center gap-2">
         {rooms.length > 1 && (
           <div role="group" aria-label="เลือกห้อง" className="flex flex-wrap gap-1">

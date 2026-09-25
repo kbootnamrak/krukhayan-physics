@@ -203,6 +203,7 @@ function QuizHeader({ quiz, units, onSaved }: { quiz: Quiz; units: { id: string;
               quiz.shuffle ? "สลับข้อและตัวเลือก" : "ไม่สลับข้อ",
               "ทำได้ครั้งเดียว",
               quiz.max_leaves > 0 ? `ออกจากหน้าครบ ${quiz.max_leaves} ครั้งส่งอัตโนมัติ` : "ออกจากหน้าได้ไม่จำกัด (บันทึกไว้)",
+              quiz.scores_released ? "ประกาศคะแนนแล้ว" : "ยังไม่ประกาศคะแนน",
             ]
               .filter(Boolean)
               .join(" · ")}

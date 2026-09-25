@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { dbErrorMessage } from "@/lib/db-error";
-import type { Quiz, QuizAttempt, QuizSession } from "@/lib/quiz";
+import type { MyAttempt, Quiz, QuizSession } from "@/lib/quiz";
 
 type Unit = { id: string; title: string; sort_order: number };
 
@@ -35,7 +35,8 @@ export default function QuizzesPanel({
   const [error, setError] = useState<string | null>(null);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [sessions, setSessions] = useState<QuizSession[]>([]);
-  const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
+  // ครู: การทำของทุกคน (ใช้นับคนส่ง) · นักเรียน: ของตัวเองผ่าน quiz_my_attempts (คะแนนซ่อนจนครูประกาศ)
+  const [attempts, setAttempts] = useState<Pick<MyAttempt, "quiz_id" | "enrollment_id" | "deadline_at" | "submitted_at" | "score" | "max_score" | "released">[]>([]);
   const [questionCount, setQuestionCount] = useState<Record<string, number>>({});
   // เวลาตอนโหลดข้อมูล ใช้ตัดสินว่าการทำไหนหมดเวลาแล้ว
   const [loadedAt, setLoadedAt] = useState(0);
@@ -55,16 +56,18 @@ export default function QuizzesPanel({
     const [sRes, aRes, qqRes] = await Promise.all([
       ids.length ? supabase.from("quiz_sessions").select("*").in("quiz_id", ids) : Promise.resolve({ data: [], error: null }),
       // นักเรียน: RLS คืนเฉพาะของตัวเอง · ครู: ใช้นับจำนวนคนที่ส่งแล้ว
-      ids.length
-        ? supabase.from("quiz_attempts").select("id, quiz_id, enrollment_id, started_at, deadline_at, submitted_at, score, max_score, answers, leave_count, leave_log, submit_reason").in("quiz_id", ids)
-        : Promise.resolve({ data: [], error: null }),
+      !ids.length
+        ? Promise.resolve({ data: [], error: null })
+        : isTeacher
+          ? supabase.from("quiz_attempts").select("quiz_id, enrollment_id, deadline_at, submitted_at, score, max_score").in("quiz_id", ids)
+          : supabase.rpc("quiz_my_attempts", { p_course: courseId }),
       isTeacher && ids.length ? supabase.from("quiz_questions").select("quiz_id").in("quiz_id", ids) : Promise.resolve({ data: [], error: null }),
     ]);
     const firstErr = [qErr, sRes.error, aRes.error, qqRes.error].find(Boolean);
     setError(firstErr ? dbErrorMessage(firstErr) : null);
     setQuizzes((qz as Quiz[]) ?? []);
     setSessions((sRes.data as QuizSession[]) ?? []);
-    setAttempts((aRes.data as QuizAttempt[]) ?? []);
+    setAttempts(((aRes.data as MyAttempt[]) ?? []).map((a) => ({ ...a, released: isTeacher ? true : a.released })));
     const counts: Record<string, number> = {};
     for (const row of (qqRes.data as { quiz_id: string }[]) ?? []) counts[row.quiz_id] = (counts[row.quiz_id] ?? 0) + 1;
     setQuestionCount(counts);
@@ -206,7 +209,9 @@ export default function QuizzesPanel({
         const expired = attempt && !attempt.submitted_at && new Date(attempt.deadline_at).getTime() < now;
         let status: React.ReactNode;
         let action: React.ReactNode = null;
-        if (attempt?.submitted_at) {
+        if (attempt?.submitted_at && !attempt.released) {
+          status = <span className="text-sm text-slate-600">ส่งแล้ว · รอครูประกาศคะแนน</span>;
+        } else if (attempt?.submitted_at) {
           status = (
             <span className="font-num tnum text-2xl font-semibold text-slate-800">
               {attempt.score ?? "–"} <span className="text-base text-slate-500">/ {attempt.max_score}</span>

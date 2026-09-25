@@ -13,6 +13,8 @@ export type Quiz = {
   shuffle: boolean;
   /** ออกจากหน้าข้อสอบได้กี่ครั้งก่อนถูกส่งอัตโนมัติ (0 = ไม่จำกัด แค่บันทึก) */
   max_leaves: number;
+  /** false = นักเรียนเห็นแค่ว่าส่งแล้ว ยังไม่เห็นคะแนน (ครูตรวจก่อนแล้วค่อยประกาศ) */
+  scores_released: boolean;
   created_at: string;
 };
 
@@ -69,7 +71,27 @@ export type TakePayload = {
 export const CHOICE_LABELS = ["ก", "ข", "ค", "ง", "จ", "ฉ"];
 
 /** ผลเมื่อการทำนี้ส่งไปแล้ว (quiz_start คืนแบบนี้แทนโจทย์) */
-export type SubmittedResult = { status: "submitted"; reason: SubmitReason | null; score: number | null; max_score: number };
+export type SubmittedResult = {
+  status: "submitted";
+  reason: SubmitReason | null;
+  /** ครูประกาศคะแนนแล้วหรือยัง — ยังไม่ประกาศ score เป็น null เสมอ */
+  released: boolean;
+  score: number | null;
+  max_score: number;
+};
+
+/** สถานะการทำของนักเรียนเอง (จาก quiz_my_attempts — นักเรียนอ่านตาราง quiz_attempts ตรง ๆ ไม่ได้) */
+export type MyAttempt = {
+  quiz_id: string;
+  enrollment_id: string;
+  started_at: string;
+  deadline_at: string;
+  submitted_at: string | null;
+  submit_reason: SubmitReason | null;
+  released: boolean;
+  score: number | null;
+  max_score: number;
+};
 
 /** แปลงรหัสข้อผิดพลาดจากฟังก์ชันในฐานข้อมูลเป็นข้อความที่นักเรียนอ่านเข้าใจ */
 export function quizErrorMessage(message: string | undefined | null): string {

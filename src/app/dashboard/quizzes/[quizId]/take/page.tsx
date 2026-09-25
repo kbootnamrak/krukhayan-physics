@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { CHOICE_LABELS, quizErrorMessage, type SubmitReason, type SubmittedResult, type TakePayload } from "@/lib/quiz";
+import { CHOICE_LABELS, quizErrorMessage, type MyAttempt, type SubmitReason, type SubmittedResult, type TakePayload } from "@/lib/quiz";
 import QuizText from "@/components/QuizText";
 
-type Done = { kind: "done"; score: number | null; max: number; reason: SubmitReason | null; courseId: string; title: string };
+type Done = { kind: "done"; score: number | null; max: number; reason: SubmitReason | null; released: boolean; courseId: string; title: string };
 type Phase =
   | { kind: "loading" }
   | { kind: "intro"; title: string; minutes: number; maxLeaves: number; courseId: string }
@@ -35,7 +35,7 @@ export default function TakeQuizPage({ params }: { params: Promise<{ quizId: str
       if (error) return setPhase({ kind: "error", message: quizErrorMessage(error.message), courseId });
       const res = data as TakePayload | SubmittedResult;
       if (res.status === "submitted") {
-        return setPhase({ kind: "done", score: res.score, max: res.max_score, reason: res.reason, courseId, title });
+        return setPhase({ kind: "done", score: res.score, max: res.max_score, reason: res.reason, released: res.released, courseId, title });
       }
       setPhase({ kind: "taking", data: res, courseId });
     },
@@ -50,13 +50,18 @@ export default function TakeQuizPage({ params }: { params: Promise<{ quizId: str
         .eq("id", quizId)
         .maybeSingle();
       if (error || !quiz) return setPhase({ kind: "error", message: "ไม่พบแบบทดสอบนี้", courseId: null });
-      const { data: attempt } = await supabase
-        .from("quiz_attempts")
-        .select("submitted_at, score, max_score, submit_reason")
-        .eq("quiz_id", quizId)
-        .maybeSingle();
+      const { data: mine } = await supabase.rpc("quiz_my_attempts", { p_course: quiz.course_id });
+      const attempt = ((mine as MyAttempt[] | null) ?? []).find((a) => a.quiz_id === quizId);
       if (attempt?.submitted_at) {
-        return setPhase({ kind: "done", score: attempt.score, max: attempt.max_score, reason: attempt.submit_reason, courseId: quiz.course_id, title: quiz.title });
+        return setPhase({
+          kind: "done",
+          score: attempt.score,
+          max: attempt.max_score,
+          reason: attempt.submit_reason,
+          released: attempt.released,
+          courseId: quiz.course_id,
+          title: quiz.title,
+        });
       }
       // เคยเริ่มแล้ว → ทำต่อเลย (ระบบนับว่าออกจากหน้า 1 ครั้ง)
       if (attempt) return start(quiz.course_id, quiz.title);
@@ -112,7 +117,9 @@ export default function TakeQuizPage({ params }: { params: Promise<{ quizId: str
         {phase.kind === "taking" && (
           <Taking
             data={phase.data}
-            onFinished={(score, max, reason) => setPhase({ kind: "done", score, max, reason, courseId: phase.courseId, title: phase.data.title })}
+            onFinished={(r) =>
+              setPhase({ kind: "done", score: r.score, max: r.max_score, reason: r.reason, released: r.released, courseId: phase.courseId, title: phase.data.title })
+            }
           />
         )}
 
@@ -126,11 +133,17 @@ export default function TakeQuizPage({ params }: { params: Promise<{ quizId: str
                   ? "หมดเวลา ระบบส่งคำตอบที่บันทึกไว้ให้แล้ว"
                   : "ส่งแล้ว"}
             </p>
-            <p className="text-slate-600">คะแนนของคุณ</p>
-            <p className="font-num tnum text-6xl font-bold text-slate-800">
-              {phase.score ?? "–"}
-              <span className="text-2xl text-slate-500"> / {phase.max}</span>
-            </p>
+            {phase.released ? (
+              <>
+                <p className="text-slate-600">คะแนนของคุณ</p>
+                <p className="font-num tnum text-6xl font-bold text-slate-800">
+                  {phase.score ?? "–"}
+                  <span className="text-2xl text-slate-500"> / {phase.max}</span>
+                </p>
+              </>
+            ) : (
+              <p className="font-display text-lg font-semibold text-slate-800">ครูจะประกาศคะแนนภายหลัง</p>
+            )}
             <BackLink courseId={phase.courseId} />
           </div>
         )}
@@ -154,7 +167,7 @@ function watermark(text: string) {
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
 
-function Taking({ data, onFinished }: { data: TakePayload; onFinished: (score: number | null, max: number, reason: SubmitReason | null) => void }) {
+function Taking({ data, onFinished }: { data: TakePayload; onFinished: (result: SubmittedResult) => void }) {
   const supabase = createClient();
   const [answers, setAnswers] = useState<Record<string, number>>(data.answers ?? {});
   const [saving, setSaving] = useState<Record<string, boolean>>({});
@@ -176,9 +189,9 @@ function Taking({ data, onFinished }: { data: TakePayload; onFinished: (score: n
   const confirming = useRef(false);
 
   const finish = useCallback(
-    (score: number | null, max: number, reason: SubmitReason | null) => {
+    (result: SubmittedResult) => {
       submittedRef.current = true;
-      onFinished(score, max, reason);
+      onFinished(result);
     },
     [onFinished]
   );
@@ -194,8 +207,7 @@ function Taking({ data, onFinished }: { data: TakePayload; onFinished: (score: n
       setSubmitting(false);
       return setError(quizErrorMessage(e.message));
     }
-    const r = res as { score: number | null; max_score: number; reason: SubmitReason | null };
-    onFinished(r.score, r.max_score, r.reason);
+    onFinished(res as SubmittedResult);
   }, [data.attempt_id, onFinished, supabase]);
 
   // นาฬิกา
@@ -224,9 +236,11 @@ function Taking({ data, onFinished }: { data: TakePayload; onFinished: (score: n
       if (seconds < 1 || submittedRef.current) return;
       const { data: res, error: e } = await supabase.rpc("quiz_log_leave", { p_attempt: data.attempt_id, p_away: seconds });
       if (e) return;
-      const r = res as { leave_count: number; max_leaves: number; submitted: boolean; score: number | null; max_score: number };
+      const r = res as { leave_count: number; max_leaves: number; submitted: boolean; released: boolean; score: number | null; max_score: number };
       setLeaves(r.leave_count);
-      if (r.submitted) return finish(r.score, r.max_score, "left_page");
+      if (r.submitted) {
+        return finish({ status: "submitted", reason: "left_page", released: r.released, score: r.score, max_score: r.max_score });
+      }
       setLeaveNotice(
         r.max_leaves > 0
           ? `คุณออกจากหน้าข้อสอบไปแล้ว ${r.leave_count} ครั้ง — ครบ ${r.max_leaves} ครั้ง ระบบจะส่งข้อสอบให้ทันที`
