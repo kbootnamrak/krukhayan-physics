@@ -56,7 +56,7 @@ export default function QuizPage({ params }: { params: Promise<{ quizId: string 
         .eq("course_id", q.course_id),
       supabase
         .from("quiz_attempts")
-        .select("id, quiz_id, enrollment_id, started_at, deadline_at, submitted_at, score, max_score, answers")
+        .select("id, quiz_id, enrollment_id, started_at, deadline_at, submitted_at, score, max_score, answers, leave_count, leave_log, submit_reason")
         .eq("quiz_id", quizId),
     ]);
     const ids = ((qqRes.data as QuizQuestion[]) ?? []).map((x) => x.id);
@@ -166,6 +166,7 @@ function QuizHeader({ quiz, units, onSaved }: { quiz: Quiz; units: { id: string;
   const [unitId, setUnitId] = useState(quiz.unit_id ?? "");
   const [minutes, setMinutes] = useState(String(quiz.time_limit_minutes));
   const [shuffle, setShuffle] = useState(quiz.shuffle);
+  const [maxLeaves, setMaxLeaves] = useState(String(quiz.max_leaves));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -174,10 +175,12 @@ function QuizHeader({ quiz, units, onSaved }: { quiz: Quiz; units: { id: string;
     const m = Number(minutes);
     if (!title.trim()) return setError("กรุณาใส่ชื่อแบบทดสอบ");
     if (!Number.isInteger(m) || m < 1 || m > 300) return setError("เวลาทำต้องเป็นจำนวนนาที 1–300");
+    const ml = Number(maxLeaves);
+    if (!Number.isInteger(ml) || ml < 0 || ml > 20) return setError("จำนวนครั้งที่ออกจากหน้าได้ต้องเป็น 0–20 (0 = ไม่จำกัด)");
     setBusy(true);
     const { error: upErr } = await supabase
       .from("quizzes")
-      .update({ title: title.trim(), unit_id: unitId || null, time_limit_minutes: m, shuffle })
+      .update({ title: title.trim(), unit_id: unitId || null, time_limit_minutes: m, shuffle, max_leaves: ml })
       .eq("id", quiz.id);
     setBusy(false);
     if (upErr) return setError(dbErrorMessage(upErr));
@@ -194,7 +197,13 @@ function QuizHeader({ quiz, units, onSaved }: { quiz: Quiz; units: { id: string;
         <div>
           <h1 className="font-display text-3xl font-bold text-slate-800">{quiz.title}</h1>
           <p className="text-slate-500 text-sm">
-            {[unitTitle, `${quiz.time_limit_minutes} นาที`, quiz.shuffle ? "สลับข้อและตัวเลือก" : "ไม่สลับข้อ", "ทำได้ครั้งเดียว"]
+            {[
+              unitTitle,
+              `${quiz.time_limit_minutes} นาที`,
+              quiz.shuffle ? "สลับข้อและตัวเลือก" : "ไม่สลับข้อ",
+              "ทำได้ครั้งเดียว",
+              quiz.max_leaves > 0 ? `ออกจากหน้าครบ ${quiz.max_leaves} ครั้งส่งอัตโนมัติ` : "ออกจากหน้าได้ไม่จำกัด (บันทึกไว้)",
+            ]
               .filter(Boolean)
               .join(" · ")}
           </p>
@@ -230,6 +239,11 @@ function QuizHeader({ quiz, units, onSaved }: { quiz: Quiz; units: { id: string;
           <input value={minutes} onChange={(e) => setMinutes(e.target.value)} inputMode="numeric" className={`${INPUT} w-full`} />
         </label>
       </div>
+      <label className="flex flex-wrap items-center gap-2 text-sm text-slate-700">
+        ส่งข้อสอบอัตโนมัติเมื่อออกจากหน้าครบ
+        <input value={maxLeaves} onChange={(e) => setMaxLeaves(e.target.value)} inputMode="numeric" aria-label="จำนวนครั้ง" className={`${INPUT} w-16 text-center`} />
+        ครั้ง <span className="text-slate-500">(0 = ไม่ส่ง แค่บันทึกจำนวนครั้ง)</span>
+      </label>
       <label className="flex items-center gap-2 text-sm text-slate-700">
         <input type="checkbox" checked={shuffle} onChange={(e) => setShuffle(e.target.checked)} className="size-4" />
         สลับลำดับข้อและตัวเลือกให้แต่ละคน (มีผลกับคนที่เริ่มทำหลังจากนี้)

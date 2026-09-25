@@ -11,6 +11,8 @@ export type Quiz = {
   title: string;
   time_limit_minutes: number;
   shuffle: boolean;
+  /** ออกจากหน้าข้อสอบได้กี่ครั้งก่อนถูกส่งอัตโนมัติ (0 = ไม่จำกัด แค่บันทึก) */
+  max_leaves: number;
   created_at: string;
 };
 
@@ -35,13 +37,28 @@ export type QuizAttempt = {
   score: number | null;
   max_score: number;
   answers: Record<string, number>;
+  leave_count: number;
+  leave_log: { at: string; away: number; kind: "switch" | "reopen" }[];
+  submit_reason: SubmitReason | null;
+};
+
+export type SubmitReason = "student" | "time_up" | "left_page";
+
+export const SUBMIT_REASON_TEXT: Record<SubmitReason, string> = {
+  student: "ส่งเอง",
+  time_up: "หมดเวลา",
+  left_page: "ส่งอัตโนมัติ (ออกจากหน้า)",
 };
 
 /** โจทย์ที่นักเรียนได้รับจาก quiz_start — ตัวเลือกสลับแล้ว k คือเลขตัวเลือกเดิม (ไม่มีเฉลย) */
 export type TakeQuestion = { id: string; prompt: string; image: string | null; choices: { k: number; text: string }[] };
 
 export type TakePayload = {
+  status: "active";
   attempt_id: string;
+  leave_count: number;
+  max_leaves: number;
+  student: { name: string | null; code: string | null };
   title: string;
   deadline_at: string;
   server_now: string;
@@ -50,6 +67,9 @@ export type TakePayload = {
 };
 
 export const CHOICE_LABELS = ["ก", "ข", "ค", "ง", "จ", "ฉ"];
+
+/** ผลเมื่อการทำนี้ส่งไปแล้ว (quiz_start คืนแบบนี้แทนโจทย์) */
+export type SubmittedResult = { status: "submitted"; reason: SubmitReason | null; score: number | null; max_score: number };
 
 /** แปลงรหัสข้อผิดพลาดจากฟังก์ชันในฐานข้อมูลเป็นข้อความที่นักเรียนอ่านเข้าใจ */
 export function quizErrorMessage(message: string | undefined | null): string {

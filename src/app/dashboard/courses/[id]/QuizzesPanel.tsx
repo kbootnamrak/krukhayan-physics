@@ -56,7 +56,7 @@ export default function QuizzesPanel({
       ids.length ? supabase.from("quiz_sessions").select("*").in("quiz_id", ids) : Promise.resolve({ data: [], error: null }),
       // นักเรียน: RLS คืนเฉพาะของตัวเอง · ครู: ใช้นับจำนวนคนที่ส่งแล้ว
       ids.length
-        ? supabase.from("quiz_attempts").select("id, quiz_id, enrollment_id, started_at, deadline_at, submitted_at, score, max_score, answers").in("quiz_id", ids)
+        ? supabase.from("quiz_attempts").select("id, quiz_id, enrollment_id, started_at, deadline_at, submitted_at, score, max_score, answers, leave_count, leave_log, submit_reason").in("quiz_id", ids)
         : Promise.resolve({ data: [], error: null }),
       isTeacher && ids.length ? supabase.from("quiz_questions").select("quiz_id").in("quiz_id", ids) : Promise.resolve({ data: [], error: null }),
     ]);
