@@ -5,7 +5,22 @@ import { createClient } from "@/lib/supabase/client";
 import { dbErrorMessage } from "@/lib/db-error";
 import { downloadBlob } from "@/lib/download";
 import { compareRoster } from "@/lib/students/order";
-import type { Quiz, QuizAttempt } from "@/lib/quiz";
+import { SUBMIT_REASON_TEXT, type Quiz, type QuizAttempt } from "@/lib/quiz";
+
+/** เวลารวมที่ออกไปจากหน้าข้อสอบ (วินาที) */
+function awaySeconds(a: QuizAttempt) {
+  return (a.leave_log ?? []).reduce((s, x) => s + (x.away ?? 0), 0);
+}
+
+/** รายละเอียดแต่ละครั้งที่ออก — แสดงเมื่อชี้ที่ตัวเลข */
+function leaveTitle(a: QuizAttempt) {
+  return (a.leave_log ?? [])
+    .map((x, i) => {
+      const t = new Date(x.at).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      return `${i + 1}) ${t} น. ${x.kind === "reopen" ? "เปิดหน้าข้อสอบใหม่" : `ออกไป ${x.away} วินาที`}`;
+    })
+    .join("\n");
+}
 
 export type RosterEnrollment = {
   id: string;
@@ -62,6 +77,8 @@ export default function ResultsPanel({
 
   function statusOf(a: QuizAttempt | null) {
     if (!a) return { text: "ยังไม่ทำ", cls: "text-slate-400" };
+    if (a.submitted_at && a.submit_reason === "left_page") return { text: SUBMIT_REASON_TEXT.left_page, cls: "text-red-700" };
+    if (a.submitted_at && a.submit_reason === "time_up") return { text: "ส่งแล้ว (หมดเวลา)", cls: "text-green-700" };
     if (a.submitted_at) return { text: "ส่งแล้ว", cls: "text-green-700" };
     if (new Date(a.deadline_at).getTime() < now) return { text: "หมดเวลา (รอตรวจ)", cls: "text-amber-700" };
     return { text: "กำลังทำ", cls: "text-trace-cyan" };
@@ -89,7 +106,16 @@ export default function ResultsPanel({
 
   async function exportExcel() {
     const XLSX = await import("xlsx");
-    const header = ["ห้อง", "เลขที่", "รหัสนักเรียน", "ชื่อ-สกุล", `คะแนน (เต็ม ${rows.find((r) => r.attempt)?.attempt?.max_score ?? ""})`, "สถานะ"];
+    const header = [
+      "ห้อง",
+      "เลขที่",
+      "รหัสนักเรียน",
+      "ชื่อ-สกุล",
+      `คะแนน (เต็ม ${rows.find((r) => r.attempt)?.attempt?.max_score ?? ""})`,
+      "สถานะ",
+      "ออกจากหน้า (ครั้ง)",
+      "เวลาที่ออกไปรวม (วินาที)",
+    ];
     const body = rows.map((r) => [
       r.classroom ?? "",
       r.class_number ?? "",
@@ -97,6 +123,8 @@ export default function ResultsPanel({
       r.full_name,
       r.attempt?.submitted_at ? (r.attempt.score ?? "") : "",
       statusOf(r.attempt).text,
+      r.attempt ? r.attempt.leave_count : "",
+      r.attempt ? awaySeconds(r.attempt) : "",
     ]);
     const sheet = XLSX.utils.aoa_to_sheet([header, ...body]);
     const book = XLSX.utils.book_new();
@@ -169,6 +197,9 @@ export default function ResultsPanel({
             <tr className="text-left text-slate-500 border-b border-slate-200">
               <th className="p-2 font-medium">นักเรียน</th>
               <th className="p-2 font-medium">สถานะ</th>
+              <th className="p-2 font-medium text-right" title="จำนวนครั้งที่ออกจากหน้าข้อสอบระหว่างทำ (สลับแอป/แท็บ/รีเฟรช)">
+                ออกจากหน้า
+              </th>
               <th className="p-2 font-medium text-right">คะแนน</th>
               <th className="p-2" />
             </tr>
@@ -185,6 +216,12 @@ export default function ResultsPanel({
                     </span>
                   </td>
                   <td className={`p-2 ${st.cls}`}>{st.text}</td>
+                  <td
+                    className={`p-2 text-right font-num tnum ${r.attempt && r.attempt.leave_count > 0 ? "text-amber-700 font-semibold" : "text-slate-400"}`}
+                    title={r.attempt?.leave_log?.length ? leaveTitle(r.attempt) : undefined}
+                  >
+                    {r.attempt ? r.attempt.leave_count : "–"}
+                  </td>
                   <td className="p-2 text-right font-num tnum whitespace-nowrap">
                     {r.attempt?.submitted_at ? (
                       <>

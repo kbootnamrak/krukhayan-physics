@@ -3,21 +3,24 @@
 import Link from "next/link";
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { CHOICE_LABELS, quizErrorMessage, type TakePayload } from "@/lib/quiz";
+import { CHOICE_LABELS, quizErrorMessage, type SubmitReason, type SubmittedResult, type TakePayload } from "@/lib/quiz";
 import QuizText from "@/components/QuizText";
 
+type Done = { kind: "done"; score: number | null; max: number; reason: SubmitReason | null; courseId: string; title: string };
 type Phase =
   | { kind: "loading" }
-  | { kind: "intro"; title: string; minutes: number; courseId: string }
+  | { kind: "intro"; title: string; minutes: number; maxLeaves: number; courseId: string }
   | { kind: "taking"; data: TakePayload; courseId: string }
-  | { kind: "done"; score: number | null; max: number; courseId: string; title: string }
+  | Done
   | { kind: "error"; message: string; courseId: string | null };
 
 /**
  * หน้าทำแบบทดสอบของนักเรียน
  * - ก่อนเริ่มมีหน้ายืนยัน (เวลาเริ่มนับทันทีที่กดเริ่ม)
- * - กดตัวเลือกแล้วบันทึกทันที เน็ตหลุดกลางทางคำตอบที่บันทึกแล้วไม่หาย กลับมาเปิดหน้านี้ทำต่อได้
+ * - แสดงทีละข้อ กดตัวเลือกแล้วบันทึกทันที เน็ตหลุดคำตอบที่บันทึกแล้วไม่หาย
  * - เวลานับจากนาฬิกาของเซิร์ฟเวอร์ หมดเวลาแล้วส่งให้อัตโนมัติ
+ * - ออกจากหน้า (สลับแอป/แท็บ/รีเฟรช) ถูกนับ ครบกำหนดแล้วเซิร์ฟเวอร์ส่งให้เอง
+ * - ลายน้ำชื่อ-รหัส และห้ามคัดลอกข้อความ (กันแคปหน้าจอไม่ได้ — ระบบปฏิบัติการไม่อนุญาต)
  * - ส่งแล้วเห็นแค่คะแนน ไม่เห็นเฉลย
  */
 export default function TakeQuizPage({ params }: { params: Promise<{ quizId: string }> }) {
@@ -25,41 +28,43 @@ export default function TakeQuizPage({ params }: { params: Promise<{ quizId: str
   const supabase = createClient();
   const [phase, setPhase] = useState<Phase>({ kind: "loading" });
 
-  const showScore = useCallback(
-    async (courseId: string, title: string) => {
-      const { data } = await supabase.from("quiz_attempts").select("score, max_score").eq("quiz_id", quizId).maybeSingle();
-      setPhase({ kind: "done", score: data?.score ?? null, max: data?.max_score ?? 0, courseId, title });
-    },
-    [quizId, supabase]
-  );
-
   const start = useCallback(
     async (courseId: string, title: string) => {
       setPhase({ kind: "loading" });
       const { data, error } = await supabase.rpc("quiz_start", { p_quiz: quizId });
-      if (error) {
-        const msg = error.message ?? "";
-        if (msg.includes("already_submitted") || msg.includes("time_up")) return showScore(courseId, title);
-        return setPhase({ kind: "error", message: quizErrorMessage(msg), courseId });
+      if (error) return setPhase({ kind: "error", message: quizErrorMessage(error.message), courseId });
+      const res = data as TakePayload | SubmittedResult;
+      if (res.status === "submitted") {
+        return setPhase({ kind: "done", score: res.score, max: res.max_score, reason: res.reason, courseId, title });
       }
-      setPhase({ kind: "taking", data: data as TakePayload, courseId });
+      setPhase({ kind: "taking", data: res, courseId });
     },
-    [quizId, showScore, supabase]
+    [quizId, supabase]
   );
 
   useEffect(() => {
     async function init() {
-      const { data: quiz, error } = await supabase.from("quizzes").select("id, course_id, title, time_limit_minutes").eq("id", quizId).maybeSingle();
+      const { data: quiz, error } = await supabase
+        .from("quizzes")
+        .select("id, course_id, title, time_limit_minutes, max_leaves")
+        .eq("id", quizId)
+        .maybeSingle();
       if (error || !quiz) return setPhase({ kind: "error", message: "ไม่พบแบบทดสอบนี้", courseId: null });
-      // เคยเริ่มแล้ว → ข้ามหน้ายืนยัน (ทำต่อ หรือดูคะแนน)
-      const { data: attempt } = await supabase.from("quiz_attempts").select("id, submitted_at").eq("quiz_id", quizId).maybeSingle();
-      if (attempt?.submitted_at) return showScore(quiz.course_id, quiz.title);
+      const { data: attempt } = await supabase
+        .from("quiz_attempts")
+        .select("submitted_at, score, max_score, submit_reason")
+        .eq("quiz_id", quizId)
+        .maybeSingle();
+      if (attempt?.submitted_at) {
+        return setPhase({ kind: "done", score: attempt.score, max: attempt.max_score, reason: attempt.submit_reason, courseId: quiz.course_id, title: quiz.title });
+      }
+      // เคยเริ่มแล้ว → ทำต่อเลย (ระบบนับว่าออกจากหน้า 1 ครั้ง)
       if (attempt) return start(quiz.course_id, quiz.title);
-      setPhase({ kind: "intro", title: quiz.title, minutes: quiz.time_limit_minutes, courseId: quiz.course_id });
+      setPhase({ kind: "intro", title: quiz.title, minutes: quiz.time_limit_minutes, maxLeaves: quiz.max_leaves, courseId: quiz.course_id });
     }
     const timer = setTimeout(init, 0);
     return () => clearTimeout(timer);
-  }, [quizId, showScore, start, supabase]);
+  }, [quizId, start, supabase]);
 
   return (
     <div className="px-4 sm:px-6 py-6 sm:py-10">
@@ -76,13 +81,20 @@ export default function TakeQuizPage({ params }: { params: Promise<{ quizId: str
         {phase.kind === "intro" && (
           <div className="bg-white border-2 border-porcelain rounded-sm p-6 space-y-5">
             <h1 className="font-display text-2xl font-bold text-slate-800">{phase.title}</h1>
-            <ul className="space-y-2 text-slate-700">
+            <ul className="list-disc pl-5 space-y-2 text-slate-700">
               <li>
-                เวลา <span className="font-num tnum font-semibold">{phase.minutes}</span> นาที นับทันทีที่กดเริ่ม
+                เวลา <span className="font-num tnum font-semibold">{phase.minutes}</span> นาที นับทันทีที่กดเริ่ม ทำได้ครั้งเดียว ส่งแล้วแก้ไม่ได้
               </li>
-              <li>ทำได้ครั้งเดียว ส่งแล้วแก้ไม่ได้</li>
-              <li>คำตอบบันทึกทุกครั้งที่กดเลือก ถ้าเน็ตหลุด กลับมาเปิดหน้านี้ทำต่อได้ (เวลายังเดินต่อ)</li>
-              <li>หมดเวลาแล้วระบบส่งให้อัตโนมัติ</li>
+              <li>คำตอบบันทึกทุกครั้งที่กดเลือก หมดเวลาแล้วระบบส่งให้อัตโนมัติ</li>
+              {phase.maxLeaves > 0 ? (
+                <li className="text-red-700">
+                  ห้ามออกจากหน้าข้อสอบ (สลับแอป เปิดแท็บอื่น พับจอ หรือรีเฟรช) — ออกครบ{" "}
+                  <span className="font-num tnum font-semibold">{phase.maxLeaves}</span> ครั้ง ระบบส่งข้อสอบให้ทันที
+                </li>
+              ) : (
+                <li>ระบบบันทึกทุกครั้งที่ออกจากหน้าข้อสอบ ครูจะเห็นจำนวนครั้ง</li>
+              )}
+              <li>หน้าข้อสอบมีชื่อและรหัสของคุณเป็นลายน้ำ</li>
             </ul>
             <div className="flex flex-wrap gap-3">
               <button
@@ -98,13 +110,23 @@ export default function TakeQuizPage({ params }: { params: Promise<{ quizId: str
         )}
 
         {phase.kind === "taking" && (
-          <Taking data={phase.data} onFinished={(score, max) => setPhase({ kind: "done", score, max, courseId: phase.courseId, title: phase.data.title })} />
+          <Taking
+            data={phase.data}
+            onFinished={(score, max, reason) => setPhase({ kind: "done", score, max, reason, courseId: phase.courseId, title: phase.data.title })}
+          />
         )}
 
         {phase.kind === "done" && (
           <div className="bg-white border-2 border-porcelain rounded-sm p-6 text-center space-y-3">
             <h1 className="font-display text-xl font-semibold text-slate-800">{phase.title}</h1>
-            <p className="text-slate-600">ส่งแล้ว คะแนนของคุณ</p>
+            <p className="text-slate-600">
+              {phase.reason === "left_page"
+                ? "ระบบส่งข้อสอบให้อัตโนมัติ เพราะออกจากหน้าข้อสอบครบกำหนด"
+                : phase.reason === "time_up"
+                  ? "หมดเวลา ระบบส่งคำตอบที่บันทึกไว้ให้แล้ว"
+                  : "ส่งแล้ว"}
+            </p>
+            <p className="text-slate-600">คะแนนของคุณ</p>
             <p className="font-num tnum text-6xl font-bold text-slate-800">
               {phase.score ?? "–"}
               <span className="text-2xl text-slate-500"> / {phase.max}</span>
@@ -125,13 +147,23 @@ function BackLink({ courseId, label = "กลับไปหน้าราย�
   );
 }
 
-function Taking({ data, onFinished }: { data: TakePayload; onFinished: (score: number | null, max: number) => void }) {
+/** ลายน้ำชื่อ-รหัสนักเรียน เต็มจอ เอียง ๆ จาง ๆ (คลิกทะลุได้) */
+function watermark(text: string) {
+  const safe = text.replace(/[<>&"]/g, "");
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='300' height='170'><text x='10' y='110' transform='rotate(-22 150 85)' font-family='sans-serif' font-size='17' fill='rgb(128,136,160)' fill-opacity='0.16'>${safe}</text></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+}
+
+function Taking({ data, onFinished }: { data: TakePayload; onFinished: (score: number | null, max: number, reason: SubmitReason | null) => void }) {
   const supabase = createClient();
   const [answers, setAnswers] = useState<Record<string, number>>(data.answers ?? {});
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [failed, setFailed] = useState<Record<string, boolean>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [index, setIndex] = useState(0);
+  const [leaves, setLeaves] = useState(data.leave_count);
+  const [leaveNotice, setLeaveNotice] = useState<string | null>(null);
 
   // ต่างเวลาระหว่างเครื่องนักเรียนกับเซิร์ฟเวอร์ — ใช้เวลาเซิร์ฟเวอร์เป็นหลัก
   const skew = useRef(0);
@@ -140,6 +172,16 @@ function Taking({ data, onFinished }: { data: TakePayload; onFinished: (score: n
   const submittedRef = useRef(false);
   // คำตอบที่กำลังบันทึกอยู่ — ตอนส่งต้องรอให้บันทึกเสร็จก่อน ไม่งั้นข้อสุดท้ายที่เพิ่งกดอาจไม่ถูกนับ
   const pendingSaves = useRef(new Set<Promise<unknown>>());
+  // กล่องยืนยันของเบราว์เซอร์ (confirm) ทำให้หน้าเสียโฟกัส — ไม่นับเป็นการออกจากหน้า
+  const confirming = useRef(false);
+
+  const finish = useCallback(
+    (score: number | null, max: number, reason: SubmitReason | null) => {
+      submittedRef.current = true;
+      onFinished(score, max, reason);
+    },
+    [onFinished]
+  );
 
   const submit = useCallback(async () => {
     if (submittedRef.current) return;
@@ -152,10 +194,11 @@ function Taking({ data, onFinished }: { data: TakePayload; onFinished: (score: n
       setSubmitting(false);
       return setError(quizErrorMessage(e.message));
     }
-    const r = res as { score: number | null; max_score: number };
-    onFinished(r.score, r.max_score);
+    const r = res as { score: number | null; max_score: number; reason: SubmitReason | null };
+    onFinished(r.score, r.max_score, r.reason);
   }, [data.attempt_id, onFinished, supabase]);
 
+  // นาฬิกา
   useEffect(() => {
     skew.current = new Date(data.server_now).getTime() - Date.now();
     const id = setInterval(() => {
@@ -165,6 +208,41 @@ function Taking({ data, onFinished }: { data: TakePayload; onFinished: (score: n
     }, 500);
     return () => clearInterval(id);
   }, [data.server_now, deadline, submit]);
+
+  // ตรวจการออกจากหน้า: ซ่อนหน้า (สลับแอป/แท็บ/พับจอ) หรือหน้าต่างเสียโฟกัส (เปิดหน้าต่างอื่นบนคอม)
+  // รายงานตอนกลับมา พร้อมระยะเวลาที่ออกไป — ออกไม่ถึง 1 วินาทีไม่นับ (เช่นแจ้งเตือนเด้งแวบเดียว)
+  useEffect(() => {
+    let awaySince: number | null = null;
+    const away = () => {
+      if (submittedRef.current || confirming.current || awaySince !== null) return;
+      awaySince = Date.now();
+    };
+    const back = async () => {
+      if (awaySince === null || document.visibilityState === "hidden" || !document.hasFocus()) return;
+      const seconds = Math.round((Date.now() - awaySince) / 1000);
+      awaySince = null;
+      if (seconds < 1 || submittedRef.current) return;
+      const { data: res, error: e } = await supabase.rpc("quiz_log_leave", { p_attempt: data.attempt_id, p_away: seconds });
+      if (e) return;
+      const r = res as { leave_count: number; max_leaves: number; submitted: boolean; score: number | null; max_score: number };
+      setLeaves(r.leave_count);
+      if (r.submitted) return finish(r.score, r.max_score, "left_page");
+      setLeaveNotice(
+        r.max_leaves > 0
+          ? `คุณออกจากหน้าข้อสอบไปแล้ว ${r.leave_count} ครั้ง — ครบ ${r.max_leaves} ครั้ง ระบบจะส่งข้อสอบให้ทันที`
+          : `คุณออกจากหน้าข้อสอบไปแล้ว ${r.leave_count} ครั้ง ครูจะเห็นจำนวนครั้งนี้`
+      );
+    };
+    const onVisibility = () => (document.visibilityState === "hidden" ? away() : back());
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("blur", away);
+    window.addEventListener("focus", back);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("blur", away);
+      window.removeEventListener("focus", back);
+    };
+  }, [data.attempt_id, finish, supabase]);
 
   async function choose(questionId: string, k: number) {
     if (submittedRef.current) return;
@@ -187,88 +265,164 @@ function Taking({ data, onFinished }: { data: TakePayload; onFinished: (score: n
   const mm = Math.floor(secs / 60);
   const ss = String(secs % 60).padStart(2, "0");
   const urgent = secs <= 60;
+  const q = data.questions[index];
+  const who = [data.student?.name, data.student?.code].filter(Boolean).join(" · ") || "KruKhayan Physics";
 
   function confirmSubmit() {
     const blank = total - answered;
     const msg = blank > 0 ? `ยังไม่ได้ตอบ ${blank} ข้อ\nส่งเลยไหม? ส่งแล้วแก้ไม่ได้` : "ส่งคำตอบเลยไหม? ส่งแล้วแก้ไม่ได้";
-    if (window.confirm(msg)) submit();
+    confirming.current = true;
+    const ok = window.confirm(msg);
+    // ให้เหตุการณ์ focus ที่ตามมาหลังปิดกล่องผ่านไปก่อน ค่อยกลับมานับตามปกติ
+    setTimeout(() => (confirming.current = false), 300);
+    if (ok) submit();
   }
 
+  const block = (e: React.SyntheticEvent) => e.preventDefault();
+
   return (
-    <div className="space-y-4">
+    <div
+      className="relative space-y-4 select-none"
+      style={{ WebkitTouchCallout: "none" }}
+      onCopy={block}
+      onCut={block}
+      onContextMenu={block}
+      onDragStart={block}
+    >
+      {/* ลายน้ำเต็มจอ */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 z-30" style={{ backgroundImage: watermark(who) }} />
+
       {/* แถบเวลาติดด้านบนตลอด */}
-      <div className="sticky top-0 z-20 -mx-4 sm:mx-0 px-4 sm:px-4 py-3 bg-slate-50 border-b-2 border-slate-200 flex items-center gap-3">
+      <div className="sticky top-0 z-20 -mx-4 sm:mx-0 px-4 py-3 bg-slate-50 border-b-2 border-slate-200 flex items-center gap-3">
         <h1 className="min-w-0 flex-1 truncate font-display font-semibold text-slate-800">{data.title}</h1>
-        <span className="text-sm text-slate-600">
+        <span className="text-sm text-slate-600 whitespace-nowrap">
           ตอบแล้ว <span className="font-num tnum font-semibold text-slate-800">{answered}</span>/<span className="font-num tnum">{total}</span>
         </span>
-        <span
-          aria-live="off"
-          aria-label={`เหลือเวลา ${mm} นาที ${ss} วินาที`}
-          className={`font-num tnum text-2xl font-bold ${urgent ? "text-red-600" : "text-slate-800"}`}
-        >
+        <span aria-label={`เหลือเวลา ${mm} นาที ${ss} วินาที`} className={`font-num tnum text-2xl font-bold ${urgent ? "text-red-600" : "text-slate-800"}`}>
           {mm}:{ss}
         </span>
       </div>
 
+      {leaveNotice && (
+        <p role="alert" className="text-sm text-amber-900 bg-amber-50 border border-amber-300 rounded-sm px-3 py-2">
+          {leaveNotice}
+        </p>
+      )}
+      {!leaveNotice && data.max_leaves > 0 && (
+        <p className="text-xs text-slate-500">
+          ห้ามออกจากหน้านี้ระหว่างทำ · ออกไปแล้ว <span className="font-num tnum">{leaves}</span>/<span className="font-num tnum">{data.max_leaves}</span> ครั้ง
+        </p>
+      )}
       {error && (
         <p role="alert" className="text-sm text-red-800 bg-red-50 border border-red-300 rounded-sm px-3 py-2">
           {error}
         </p>
       )}
 
-      <ol className="space-y-4">
-        {data.questions.map((q, i) => (
-          <li key={q.id} className="bg-white border border-slate-200 rounded-sm p-4 space-y-3">
-            <p className="text-slate-800 leading-relaxed">
-              <span className="font-display font-bold mr-1.5">{i + 1}.</span>
-              <QuizText text={q.prompt} />
-            </p>
-            {q.image && (
-              // eslint-disable-next-line @next/next/no-img-element -- data URI ใช้ next/image ไม่ได้
-              <img src={q.image} alt={`รูปประกอบข้อ ${i + 1}`} className="max-h-72 w-auto max-w-full rounded-sm border border-slate-200 bg-[oklch(100%_0_0)]" />
-            )}
-            <div role="radiogroup" aria-label={`ตัวเลือกข้อ ${i + 1}`} className="grid gap-2">
-              {q.choices.map((c, j) => {
-                const on = answers[q.id] === c.k;
-                return (
-                  <button
-                    key={c.k}
-                    type="button"
-                    role="radio"
-                    aria-checked={on}
-                    disabled={submitting}
-                    onClick={() => choose(q.id, c.k)}
-                    className={`flex items-start gap-3 rounded-sm border-2 px-3 py-2.5 text-left transition-colors ${
-                      on ? "border-trace-cyan bg-[color-mix(in_oklch,var(--trace-cyan)_14%,transparent)]" : "border-slate-200 hover:border-slate-400"
+      {/* ข้อปัจจุบัน */}
+      {q && (
+        <section aria-label={`ข้อ ${index + 1} จาก ${total}`} className="bg-white border border-slate-200 rounded-sm p-4 space-y-3">
+          <p className="text-slate-800 leading-relaxed">
+            <span className="font-display font-bold mr-1.5">{index + 1}.</span>
+            <QuizText text={q.prompt} />
+          </p>
+          {q.image && (
+            // eslint-disable-next-line @next/next/no-img-element -- data URI ใช้ next/image ไม่ได้
+            <img src={q.image} alt={`รูปประกอบข้อ ${index + 1}`} draggable={false} className="max-h-72 w-auto max-w-full rounded-sm border border-slate-200 bg-[oklch(100%_0_0)]" />
+          )}
+          <div role="radiogroup" aria-label={`ตัวเลือกข้อ ${index + 1}`} className="grid gap-2">
+            {q.choices.map((c, j) => {
+              const on = answers[q.id] === c.k;
+              return (
+                <button
+                  key={c.k}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  disabled={submitting}
+                  onClick={() => choose(q.id, c.k)}
+                  className={`flex items-start gap-3 rounded-sm border-2 px-3 py-2.5 text-left transition-colors ${
+                    on ? "border-trace-cyan bg-[color-mix(in_oklch,var(--trace-cyan)_14%,transparent)]" : "border-slate-200 hover:border-slate-400"
+                  }`}
+                >
+                  <span
+                    className={`grid place-items-center size-7 shrink-0 rounded-full border-2 font-display text-sm font-semibold ${
+                      on ? "border-trace-cyan bg-trace-cyan text-[var(--sign-ink)]" : "border-slate-300 text-slate-500"
                     }`}
                   >
-                    <span
-                      className={`grid place-items-center size-7 shrink-0 rounded-full border-2 font-display text-sm font-semibold ${
-                        on ? "border-trace-cyan bg-trace-cyan text-[var(--sign-ink)]" : "border-slate-300 text-slate-500"
-                      }`}
-                    >
-                      {CHOICE_LABELS[j]}
-                    </span>
-                    <QuizText text={c.text} className="pt-0.5 text-slate-800" />
-                  </button>
-                );
-              })}
-            </div>
-            {saving[q.id] && <p className="text-xs text-slate-400">กำลังบันทึก...</p>}
-            {failed[q.id] && !saving[q.id] && <p className="text-xs text-red-600">ยังไม่ได้บันทึกข้อนี้ กดเลือกอีกครั้ง</p>}
-          </li>
-        ))}
-      </ol>
+                    {CHOICE_LABELS[j]}
+                  </span>
+                  <QuizText text={c.text} className="pt-0.5 text-slate-800" />
+                </button>
+              );
+            })}
+          </div>
+          {saving[q.id] && <p className="text-xs text-slate-400">กำลังบันทึก...</p>}
+          {failed[q.id] && !saving[q.id] && <p className="text-xs text-red-600">ยังไม่ได้บันทึกข้อนี้ กดเลือกอีกครั้ง</p>}
+        </section>
+      )}
 
-      <button
-        type="button"
-        onClick={confirmSubmit}
-        disabled={submitting}
-        className="w-full rounded-sm py-3 font-semibold bg-[oklch(50%_0.24_345)] text-[oklch(100%_0_0)] hover:bg-[oklch(55%_0.25_345)] disabled:opacity-50"
-      >
-        {submitting ? "กำลังส่ง..." : `ส่งคำตอบ (ตอบแล้ว ${answered}/${total} ข้อ)`}
-      </button>
+      {/* ก่อนหน้า / ถัดไป */}
+      <div className="flex gap-3">
+        <button
+          type="button"
+          onClick={() => setIndex((i) => Math.max(0, i - 1))}
+          disabled={index === 0}
+          className="flex-1 rounded-sm border-2 border-slate-300 py-2.5 font-semibold text-slate-700 disabled:opacity-30"
+        >
+          ← ข้อก่อนหน้า
+        </button>
+        {index < total - 1 ? (
+          <button
+            type="button"
+            onClick={() => setIndex((i) => Math.min(total - 1, i + 1))}
+            className="flex-1 rounded-sm border-2 border-porcelain py-2.5 font-semibold text-slate-800"
+          >
+            ข้อถัดไป →
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={confirmSubmit}
+            disabled={submitting}
+            className="flex-1 rounded-sm py-2.5 font-semibold bg-[oklch(50%_0.24_345)] text-[oklch(100%_0_0)] hover:bg-[oklch(55%_0.25_345)] disabled:opacity-50"
+          >
+            {submitting ? "กำลังส่ง..." : "ส่งคำตอบ"}
+          </button>
+        )}
+      </div>
+
+      {/* เลขข้อทั้งหมด: กดกระโดดไปข้อนั้น · ทึบ = ตอบแล้ว */}
+      <nav aria-label="เลือกข้อ" className="bg-white border border-slate-200 rounded-sm p-3 space-y-3">
+        <div className="grid grid-cols-8 sm:grid-cols-10 gap-1.5">
+          {data.questions.map((qq, i) => {
+            const done = answers[qq.id] !== undefined;
+            const current = i === index;
+            return (
+              <button
+                key={qq.id}
+                type="button"
+                onClick={() => setIndex(i)}
+                aria-label={`ไปข้อ ${i + 1}${done ? " (ตอบแล้ว)" : ""}`}
+                aria-current={current ? "step" : undefined}
+                className={`font-num tnum h-9 rounded-sm border-2 text-sm font-semibold ${
+                  done ? "bg-trace-cyan border-trace-cyan text-[var(--sign-ink)]" : "border-slate-300 text-slate-600"
+                } ${current ? "ring-2 ring-offset-2 ring-offset-[var(--c-white)] ring-[var(--porcelain)]" : ""}`}
+              >
+                {i + 1}
+              </button>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          onClick={confirmSubmit}
+          disabled={submitting}
+          className="w-full rounded-sm py-2.5 text-sm font-semibold border-2 border-[oklch(50%_0.24_345)] text-slate-800 hover:bg-slate-100 disabled:opacity-50"
+        >
+          {submitting ? "กำลังส่ง..." : `ส่งคำตอบ (ตอบแล้ว ${answered}/${total} ข้อ)`}
+        </button>
+      </nav>
     </div>
   );
 }
