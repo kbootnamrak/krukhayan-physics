@@ -2,15 +2,16 @@
 
 import { use, useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { calcGrade, type GradeScale } from "@/lib/grade";
+import { type GradeScale } from "@/lib/grade";
 import { dbErrorMessage } from "@/lib/db-error";
-import { fmt, gradedItems, scoreLookup, summarize } from "@/lib/scores";
+import { scoreLookup } from "@/lib/scores";
 import Breadcrumbs from "../../Breadcrumbs";
 import UnitsPanel from "./UnitsPanel";
 import ScoresPanel, { type Enrollment, type ScoreRow } from "./ScoresPanel";
 import StudentsPanel, { type RosterRow } from "./StudentsPanel";
 import MaterialsPanel from "./MaterialsPanel";
 import GradeScalePanel from "./GradeScalePanel";
+import StudentRoute from "./StudentRoute";
 
 type Tab = "units" | "scores" | "students" | "materials" | "grade";
 type CourseInfo = { code: string; name: string; year: number | null; semester: number | null };
@@ -158,7 +159,6 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
 
   const myEnrollment = enrollments.find((e) => e.student_id === userId);
   const myScore = scoreLookup(scores, myEnrollment?.id ?? "");
-  const mySummary = summarize(gradedItems(components, exams), myScore);
 
   const tabs: { key: Tab; label: string; teacherOnly?: boolean }[] = [
     { key: "units", label: "หน่วยการเรียนรู้", teacherOnly: true },
@@ -169,12 +169,16 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
   ];
 
   return (
-    <div className="px-6 py-10">
+    <div className="px-4 sm:px-6 py-8 sm:py-10">
       <div className="max-w-5xl mx-auto space-y-6">
         <div className="space-y-2">
           <Breadcrumbs items={[{ label: "หน้าหลัก", href: "/dashboard" }, coursesCrumb, { label: course.name }]} />
-          <h1 className="text-2xl font-semibold text-slate-800">
-            {course.name} <span className="text-base font-normal text-slate-500">{termText}</span>
+          {/* ชื่อวิชาเป็นป้ายสาย: กรอบสีกระเบื้อง ตัวอักษรแบบป้ายสถานี */}
+          <h1 className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <span className="rounded-md border-2 border-porcelain px-3 py-0.5 font-sign text-3xl font-semibold text-slate-800 leading-tight">
+              {course.name}
+            </span>
+            {termText && <span className="text-base font-normal text-slate-500">{termText}</span>}
           </h1>
         </div>
 
@@ -194,8 +198,10 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
                 role="tab"
                 aria-selected={activeTab === t.key}
                 onClick={() => setTab(t.key)}
-                className={`px-4 py-2 text-sm whitespace-nowrap ${
-                  activeTab === t.key ? "border-b-2 border-slate-800 text-slate-800 font-medium" : "text-slate-500"
+                className={`-mb-px border-b-[3px] px-4 py-2.5 text-sm whitespace-nowrap ${
+                  activeTab === t.key
+                    ? "border-line-scarlet text-slate-800 font-medium"
+                    : "border-transparent text-slate-500 hover:text-slate-700"
                 }`}
               >
                 {t.label}
@@ -238,76 +244,14 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
         )}
 
         {activeTab === "grade" && !isTeacher && myEnrollment && (
-          <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-4">
-            {units.map((u) => {
-              const unitComponents = components
-                .filter((c) => c.unit_id === u.id)
-                .sort((a, b) => "KPA".indexOf(a.category) - "KPA".indexOf(b.category));
-              if (unitComponents.length === 0) return null;
-              return (
-                <div key={u.id} className="border-b border-slate-100 pb-3">
-                  <p className="font-medium text-slate-700 text-sm mb-1">{u.title}</p>
-                  <div className="flex gap-4 flex-wrap text-sm text-slate-600">
-                    {unitComponents.map((c) => {
-                      const s = myScore("unit_component", c.id);
-                      return (
-                        <span key={c.id}>
-                          {c.category}: {s === null ? <span className="text-slate-400">ยังไม่มีคะแนน</span> : fmt(s)} /{" "}
-                          {fmt(Number(c.max_score))}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-            {exams.length > 0 && (
-              <div className="flex gap-4 flex-wrap text-sm text-slate-600">
-                {[...exams]
-                  .sort((a, b) => (a.exam_type === "midterm" ? -1 : 1) - (b.exam_type === "midterm" ? -1 : 1))
-                  .map((e) => {
-                    const s = myScore("exam", e.id);
-                    return (
-                      <span key={e.id}>
-                        {e.exam_type === "midterm" ? "กลางภาค" : "ปลายภาค"}:{" "}
-                        {s === null ? <span className="text-slate-400">ยังไม่มีคะแนน</span> : fmt(s)} /{" "}
-                        {fmt(Number(e.max_score))}
-                      </span>
-                    );
-                  })}
-              </div>
-            )}
-
-            <div className="pt-3 border-t border-slate-200">
-              {mySummary.complete ? (
-                // กรอกครบทุกรายการแล้ว — เกรดนี้คือเกรดจริง
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-slate-700 font-medium">
-                    รวม {fmt(mySummary.earned)} / {fmt(mySummary.maxAll)} ({(mySummary.percentFinal ?? 0).toFixed(1)}%)
-                  </span>
-                  <span className="text-xl font-semibold text-slate-800">
-                    เกรด {calcGrade(mySummary.percentFinal ?? 0, gradeScales)}
-                  </span>
-                </div>
-              ) : (
-                // ยังไม่ครบ — ไม่แสดงเกรด เพราะช่องที่ยังไม่ตรวจจะถูกนับเป็น 0 แล้วเกรดจะต่ำเกินจริงมาก
-                <div className="space-y-1">
-                  {mySummary.percentAssessed === null ? (
-                    <p className="text-slate-700">ยังไม่มีคะแนน</p>
-                  ) : (
-                    <p className="text-slate-700 font-medium">
-                      ได้ {fmt(mySummary.earned)} จาก {fmt(mySummary.maxAssessed)} คะแนนที่ตรวจแล้ว (
-                      {mySummary.percentAssessed.toFixed(1)}%)
-                    </p>
-                  )}
-                  <p className="text-sm text-slate-500">
-                    เกรดจะแสดงเมื่อครูให้คะแนนครบทุกรายการ (เหลืออีก {mySummary.missing} รายการ จากคะแนนเต็มทั้งวิชา{" "}
-                    {fmt(mySummary.maxAll)})
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
+          <StudentRoute
+            courseId={courseId}
+            units={units}
+            components={components}
+            exams={exams}
+            myScore={myScore}
+            gradeScales={gradeScales}
+          />
         )}
       </div>
     </div>

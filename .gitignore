@@ -44,3 +44,8 @@ next-env.d.ts
 # เฟิร์มแวร์: คีย์อุปกรณ์และรหัส Wi-Fi อยู่ในไฟล์นี้
 firmware/**/config.h
 .claude/skills/impeccable/scripts/bin/
+
+# Impeccable: ไฟล์ทำงานชั่วคราวและค่าเฉพาะเครื่อง
+.impeccable/config.local.json
+.impeccable/review/
+.impeccable/questions/
