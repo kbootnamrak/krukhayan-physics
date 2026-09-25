@@ -7,6 +7,7 @@ import { dbErrorMessage } from "@/lib/db-error";
 import { SCHOOL_EMAIL_DOMAIN } from "@/lib/school";
 import { parseRoster } from "@/lib/students/parse-roster";
 import { compareRoster, placeLabel } from "@/lib/students/order";
+import { describeDevice, type DeviceEvent } from "@/lib/device";
 
 export type RosterRow = {
   id: string;
@@ -39,6 +40,49 @@ export default function StudentsPanel({
   const activeRoom = rooms.includes(room) ? room : "";
   const shown = activeRoom ? roster.filter((r) => r.classroom === activeRoom) : roster;
   const signedIn = shown.filter((r) => r.claimed_by !== null).length;
+
+  // เครื่องที่นักเรียนแต่ละคนใช้ + เครื่องที่ถูกใช้หลายบัญชี (สัญญาณล็อกอินทำแทนเพื่อน)
+  const [devices, setDevices] = useState<DeviceEvent[]>([]);
+  const [openDevices, setOpenDevices] = useState<string | null>(null);
+  const loadDevices = useCallback(async () => {
+    const ids = roster.map((r) => r.claimed_by).filter((x): x is string => !!x);
+    if (!ids.length) return setDevices([]);
+    const { data } = await supabase
+      .from("device_events")
+      .select("user_id, device_id, user_agent, ip, kind, quiz_id, at")
+      .in("user_id", ids)
+      .order("at", { ascending: false })
+      .limit(5000);
+    setDevices((data as DeviceEvent[]) ?? []);
+  }, [roster, supabase]);
+  useEffect(() => {
+    const timer = setTimeout(loadDevices, 0);
+    return () => clearTimeout(timer);
+  }, [loadDevices]);
+
+  const nameOfUser = new Map(roster.filter((r) => r.claimed_by).map((r) => [r.claimed_by as string, r.full_name]));
+  // device_id → ผู้ใช้ทั้งหมดที่เคยใช้เครื่องนี้
+  const usersOfDevice = new Map<string, Set<string>>();
+  for (const d of devices) {
+    if (!usersOfDevice.has(d.device_id)) usersOfDevice.set(d.device_id, new Set());
+    usersOfDevice.get(d.device_id)!.add(d.user_id);
+  }
+  const sharedDevices = [...usersOfDevice.entries()].filter(([, users]) => users.size > 1);
+  function devicesOf(userId: string) {
+    const byDevice = new Map<string, { device_id: string; label: string; last: string; ip: string | null; count: number }>();
+    for (const d of devices) {
+      if (d.user_id !== userId) continue;
+      const cur = byDevice.get(d.device_id);
+      if (cur) cur.count++;
+      else byDevice.set(d.device_id, { device_id: d.device_id, label: describeDevice(d.user_agent), last: d.at, ip: d.ip, count: 1 });
+    }
+    return [...byDevice.values()];
+  }
+  function sharedWith(userId: string) {
+    const others = new Set<string>();
+    for (const [, users] of sharedDevices) if (users.has(userId)) users.forEach((u) => u !== userId && others.add(u));
+    return [...others].map((u) => nameOfUser.get(u) ?? "บัญชีนอกวิชานี้");
+  }
 
   // PIN สำหรับนักเรียนที่เข้าอีเมลโรงเรียนไม่ได้
   const [pinRosterIds, setPinRosterIds] = useState<Set<string>>(new Set());
@@ -243,6 +287,18 @@ export default function StudentsPanel({
         </p>
       )}
 
+      {sharedDevices.length > 0 && (
+        <div className="text-sm text-amber-900 bg-amber-50 border border-amber-300 rounded-sm px-3 py-2 space-y-1">
+          <p className="font-semibold">พบเครื่องที่ถูกใช้โดยบัญชีนักเรียนหลายคน {sharedDevices.length} เครื่อง</p>
+          <ul className="list-disc pl-5">
+            {sharedDevices.map(([id, users]) => (
+              <li key={id}>{[...users].map((u) => nameOfUser.get(u) ?? "บัญชีนอกวิชานี้").join(" · ")}</li>
+            ))}
+          </ul>
+          <p className="text-xs">อาจเป็นการล็อกอินแทนกัน หรือใช้เครื่องร่วมกันจริง (เช่น พี่น้อง / คอมห้องเรียน) — ควรสอบถามก่อนสรุป</p>
+        </div>
+      )}
+
       <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100">
         {roster.length === 0 && (
           <p className="p-4 text-sm text-slate-400">ยังไม่มีรายชื่อนักเรียนในวิชานี้</p>
@@ -256,6 +312,19 @@ export default function StudentsPanel({
                 {r.student_code}
                 {placeLabel(r) && <span> · {placeLabel(r)}</span>}
               </p>
+              {r.claimed_by && devicesOf(r.claimed_by).length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setOpenDevices(openDevices === r.id ? null : r.id)}
+                  className="text-xs text-slate-500 hover:text-slate-800 underline-offset-2 hover:underline"
+                >
+                  {devicesOf(r.claimed_by)[0].label}
+                  {devicesOf(r.claimed_by).length > 1 && ` + อีก ${devicesOf(r.claimed_by).length - 1} เครื่อง`}
+                </button>
+              )}
+              {r.claimed_by && sharedWith(r.claimed_by).length > 0 && (
+                <p className="text-xs font-semibold text-amber-700">เครื่องเดียวกับ: {sharedWith(r.claimed_by).join(", ")}</p>
+              )}
             </div>
             <div className="flex items-center gap-3 shrink-0">
               <span
@@ -296,6 +365,27 @@ export default function StudentsPanel({
               </button>
             </div>
           </div>
+          {openDevices === r.id && r.claimed_by && (
+            <ul className="mx-3 mb-3 rounded-sm border border-slate-200 divide-y divide-slate-100 text-xs">
+              {devicesOf(r.claimed_by).map((d) => {
+                const others = [...(usersOfDevice.get(d.device_id) ?? [])].filter((u) => u !== r.claimed_by);
+                return (
+                  <li key={d.device_id} className="px-3 py-2 flex flex-wrap gap-x-4 gap-y-0.5">
+                    <span className="font-semibold text-slate-700">{d.label}</span>
+                    <span className="text-slate-500">
+                      ล่าสุด {new Date(d.last).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })}
+                    </span>
+                    {d.ip && <span className="text-slate-400">IP {d.ip}</span>}
+                    {others.length > 0 && (
+                      <span className="text-amber-700 font-semibold">
+                        ใช้โดย: {others.map((u) => nameOfUser.get(u) ?? "บัญชีนอกวิชานี้").join(", ")}
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
           {pinError?.rosterId === r.id && (
             <p role="alert" className="mx-3 mb-3 text-sm text-red-800 bg-red-50 border border-red-300 rounded-sm px-3 py-2">
               {pinError.message}

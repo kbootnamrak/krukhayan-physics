@@ -5,6 +5,7 @@ import { use, useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { CHOICE_LABELS, quizErrorMessage, type MyAttempt, type SubmitReason, type SubmittedResult, type TakePayload } from "@/lib/quiz";
 import QuizText from "@/components/QuizText";
+import { getDeviceId } from "@/lib/device";
 
 type Done = { kind: "done"; score: number | null; max: number; reason: SubmitReason | null; released: boolean; courseId: string; title: string };
 type Phase =
@@ -38,6 +39,9 @@ export default function TakeQuizPage({ params }: { params: Promise<{ quizId: str
         return setPhase({ kind: "done", score: res.score, max: res.max_score, reason: res.reason, released: res.released, courseId, title });
       }
       setPhase({ kind: "taking", data: res, courseId });
+      // บันทึกเครื่องที่ใช้ทำชุดนี้ (ครูเห็นในแท็บผลสอบ ถ้าหลายคนทำบนเครื่องเดียวกันจะมีธงเตือน)
+      const device = getDeviceId();
+      if (device) supabase.rpc("log_device", { p_device: device, p_kind: "quiz", p_quiz: quizId }).then(() => undefined, () => undefined);
     },
     [quizId, supabase]
   );
@@ -99,7 +103,7 @@ export default function TakeQuizPage({ params }: { params: Promise<{ quizId: str
               ) : (
                 <li>ระบบบันทึกทุกครั้งที่ออกจากหน้าข้อสอบ ครูจะเห็นจำนวนครั้ง</li>
               )}
-              <li>หน้าข้อสอบมีชื่อและรหัสของคุณเป็นลายน้ำ</li>
+              <li>หน้าข้อสอบมีชื่อและรหัสของคุณเป็นลายน้ำ และระบบบันทึกเครื่องที่ใช้ทำ</li>
             </ul>
             <div className="flex flex-wrap gap-3">
               <button
