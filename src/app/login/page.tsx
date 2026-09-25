@@ -83,7 +83,7 @@ function LoginForm() {
         type="button"
         onClick={handleGoogleLogin}
         disabled={loading}
-        className="w-full flex items-center justify-center gap-2 rounded-sm py-2.5 text-sm font-semibold bg-[oklch(50%_0.24_345)] text-white hover:bg-[oklch(55%_0.25_345)] disabled:opacity-50"
+        className="w-full flex items-center justify-center gap-2 rounded-sm py-2.5 text-sm font-semibold bg-[oklch(50%_0.24_345)] text-[oklch(100%_0_0)] hover:bg-[oklch(55%_0.25_345)] disabled:opacity-50"
       >
         {/* โลโก้ Google บนวงกลมขาว ให้เห็นชัดบนปุ่มสีชมพู */}
         <span className="grid place-items-center size-6 rounded-full bg-[oklch(100%_0_0)]">
@@ -153,20 +153,24 @@ export default function LoginPage() {
   return (
     // หน้าแรกที่ทุกคนเห็น: ภาพฟิสิกส์ไซเบอร์พังค์เต็มที่ฝั่งซ้าย ฟอร์มเข้าสู่ระบบฝั่งขวา (มือถือ: ภาพอยู่บน)
     <div className="lg:min-h-screen lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-      <section className="relative flex flex-col justify-center gap-4 px-6 pt-8 lg:px-14 lg:py-12 overflow-hidden">
-        <div className="relative z-10 flex items-center gap-2.5 lg:absolute lg:top-8 lg:left-14">
+      {/* โลโก้อยู่บนสุดในลำดับปกติ (ไม่ลอย) — เดิมลอยทับหัวข้อเมื่อจอเตี้ย */}
+      <section className="relative flex flex-col gap-6 px-6 pt-8 lg:px-14 lg:py-10 overflow-hidden">
+        <div className="relative z-10 flex items-center gap-2.5">
           <ChipMark />
           <span className="font-display font-semibold uppercase tracking-[0.06em] text-[15px] text-slate-800">KruKhayan Physics</span>
         </div>
-        <div className="relative z-10 space-y-2">
-          <h1 className="font-display text-4xl sm:text-5xl font-bold leading-[1.05] text-slate-800">
-            ห้องเรียน<span className="text-trace-magenta">ฟิสิกส์</span>
-            <br />
-            ของครูขยัน
-          </h1>
-          <p className="text-slate-600 max-w-md">คะแนน สื่อการสอน และข้อมูลจากเครื่องวัดจริง รวมไว้ในที่เดียว</p>
+        <div className="flex flex-1 flex-col justify-center gap-4">
+          <div className="relative z-10 space-y-3">
+            {/* ระยะบรรทัด 1.25 เผื่อสระบนและวรรณยุกต์ของภาษาไทย ไม่ให้ชนบรรทัดบน */}
+            <h1 className="font-display text-4xl sm:text-5xl font-bold leading-[1.25] text-slate-800">
+              ห้องเรียน<span className="text-trace-magenta">ฟิสิกส์</span>
+              <br />
+              ของครูขยัน
+            </h1>
+            <p className="text-slate-600 max-w-md">คะแนน สื่อการสอน และข้อมูลจากเครื่องวัดจริง รวมไว้ในที่เดียว</p>
+          </div>
+          <PhysicsHero className="w-full max-w-[640px] h-auto -mx-2 max-lg:h-44 lg:max-h-[60vh]" />
         </div>
-        <PhysicsHero className="w-full max-w-[640px] h-auto -mx-2 max-lg:h-44" />
       </section>
 
       <section className="flex flex-col items-center justify-center gap-4 px-4 pt-2 pb-10 lg:py-12 lg:bg-slate-50/60 lg:border-l lg:border-slate-200">
