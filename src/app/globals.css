@@ -1,7 +1,8 @@
 @import "tailwindcss";
 
 /*
- * โลกของเว็บ: แผนที่รถไฟฟ้าบนเคลือบสีกรมท่า (ธีมมืดเป็นค่าเริ่มต้น สลับเป็นสว่างได้ที่แถบบน)
+ * โลกของเว็บ: แผ่นวงจร (PCB) สีกรมท่ายามค่ำ ลายทองแดงเรืองแสงนีออนแบบไซเบอร์พังค์
+ * ธีมมืดเป็นค่าเริ่มต้น สลับเป็นสว่างได้ที่แถบบน
  *
  * หน้าเดิมทั้งเว็บเขียนด้วยสี slate/white/red/green/amber ของ Tailwind
  * จึงผูกสีเหล่านั้นเข้ากับโทเคนชุดนี้ — ทุกหน้าเปลี่ยนธีมตามกันโดยไม่ต้องแก้ทีละไฟล์
@@ -49,11 +50,11 @@
 
   --c-blue-700: oklch(76% 0.13 262);
 
-  /* หมึกของสายรถไฟ — หน่วยการเรียนแต่ละหน่วยได้สีหนึ่งสาย วนตามลำดับ */
-  --line-scarlet: oklch(64% 0.215 27);
-  --line-cobalt: oklch(63% 0.19 262);
-  --line-amber: oklch(83% 0.165 80);
-  --line-green: oklch(71% 0.175 150);
+  /* สีลายวงจรนีออน — หน่วยการเรียนแต่ละหน่วยได้หนึ่งสี วนตามลำดับ (ดู src/lib/traces.ts) */
+  --trace-magenta: oklch(66% 0.26 345);
+  --trace-cyan: oklch(83% 0.14 205);
+  --trace-yellow: oklch(90% 0.17 102);
+  --trace-lime: oklch(85% 0.2 138);
   /* วงสถานี สายสอบ และปลายทาง: สีกระเบื้องขาวบนพื้นมืด / สีหมึกกรมท่าบนพื้นสว่าง */
   --porcelain: oklch(96% 0.01 268);
   /* ตัวอักษรบนป้ายสีเหลืองอำพัน ต้องเข้มเสมอทั้งสองธีม */
@@ -104,10 +105,10 @@
 
   --c-blue-700: oklch(48.8% 0.243 264.376);
 
-  --line-scarlet: oklch(56% 0.215 27);
-  --line-cobalt: oklch(50% 0.2 262);
-  --line-amber: oklch(74% 0.165 72);
-  --line-green: oklch(57% 0.16 150);
+  --trace-magenta: oklch(54% 0.25 345);
+  --trace-cyan: oklch(58% 0.12 215);
+  --trace-yellow: oklch(72% 0.16 85);
+  --trace-lime: oklch(60% 0.17 140);
   --porcelain: oklch(25% 0.05 268);
   --glow-strength: 0;
 }
@@ -148,36 +149,46 @@
   --color-amber-900: var(--c-amber-900);
   --color-blue-700: var(--c-blue-700);
 
-  --color-line-scarlet: var(--line-scarlet);
-  --color-line-cobalt: var(--line-cobalt);
-  --color-line-amber: var(--line-amber);
-  --color-line-green: var(--line-green);
+  --color-trace-magenta: var(--trace-magenta);
+  --color-trace-cyan: var(--trace-cyan);
+  --color-trace-yellow: var(--trace-yellow);
+  --color-trace-lime: var(--trace-lime);
   --color-porcelain: var(--porcelain);
 
-  /* ภาษาไทยใช้ Anuphan · ป้ายและตัวเลขใช้ Barlow Semi Condensed แบบป้ายสถานี */
+  /* เนื้อหาใช้ Anuphan · หัวข้อ/ป้ายใช้ Chakra Petch (มีภาษาไทย ทรงเหลี่ยมแบบไซเบอร์) · ตัวเลขคะแนนใช้ Barlow Semi Condensed */
   --font-sans: var(--font-anuphan), system-ui, sans-serif;
-  --font-sign: var(--font-barlow), var(--font-anuphan), system-ui, sans-serif;
+  --font-display: var(--font-chakra), var(--font-anuphan), system-ui, sans-serif;
+  --font-num: var(--font-barlow), var(--font-anuphan), system-ui, sans-serif;
 }
 
+/*
+ * พื้นหลังทุกหน้า: ลายแผ่นวงจรจาง ๆ (ลายทองแดง + จุดบัดกรี) — จางพอไม่รบกวนตัวหนังสือ
+ * ธีมสว่างใช้ลายสีหมึก ธีมมืดใช้ลายสีฟ้านีออน
+ */
 body {
-  background: var(--c-slate-50);
+  background-color: var(--c-slate-50);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240' fill='none'%3E%3Cg stroke='%2376e4f7' stroke-opacity='.07' stroke-width='2'%3E%3Cpath d='M0 40h60l20 20h60M240 120h-50l-20-20h-40M40 240v-50l20-20v-40M200 0v30l20 20h20M120 240v-30l-20-20H60'/%3E%3C/g%3E%3Cg fill='%2376e4f7' fill-opacity='.1'%3E%3Ccircle cx='140' cy='60' r='4'/%3E%3Ccircle cx='130' cy='100' r='4'/%3E%3Ccircle cx='60' cy='130' r='4'/%3E%3Ccircle cx='60' cy='190' r='4'/%3E%3C/g%3E%3C/svg%3E");
   color: var(--c-slate-800);
 }
 
+:root[data-theme="light"] body {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240' fill='none'%3E%3Cg stroke='%231f2a4d' stroke-opacity='.05' stroke-width='2'%3E%3Cpath d='M0 40h60l20 20h60M240 120h-50l-20-20h-40M40 240v-50l20-20v-40M200 0v30l20 20h20M120 240v-30l-20-20H60'/%3E%3C/g%3E%3Cg fill='%231f2a4d' fill-opacity='.07'%3E%3Ccircle cx='140' cy='60' r='4'/%3E%3Ccircle cx='130' cy='100' r='4'/%3E%3Ccircle cx='60' cy='130' r='4'/%3E%3Ccircle cx='60' cy='190' r='4'/%3E%3C/g%3E%3C/svg%3E");
+}
+
 ::selection {
-  background: color-mix(in oklch, var(--line-cobalt) 45%, transparent);
+  background: color-mix(in oklch, var(--trace-cyan) 45%, transparent);
   color: var(--c-slate-900);
 }
 
 :focus-visible {
-  outline: 2px solid var(--line-amber);
+  outline: 2px solid var(--trace-yellow);
   outline-offset: 2px;
 }
 
 input,
 select,
 textarea {
-  caret-color: var(--line-amber);
+  caret-color: var(--trace-yellow);
 }
 
 html {
@@ -220,7 +231,37 @@ html {
   }
 }
 
-/* ธีมสว่าง: วงโฟกัสสีอำพันจางเกินบนพื้นขาว ใช้สีโคบอลต์แทน */
+/* ธีมสว่าง: วงโฟกัสสีเหลืองจางเกินบนพื้นขาว ใช้สีฟ้าเข้มแทน */
 :root[data-theme="light"] :focus-visible {
-  outline-color: var(--line-cobalt);
+  outline-color: var(--trace-cyan);
+}
+
+/* ธีมสว่างไม่มีแสงเรืองในภาพตกแต่ง — แสงนีออนบนพื้นขาวดูเลอะ */
+:root[data-theme="light"] .neon-soft {
+  filter: none;
+}
+
+/*
+ * สัญญาณวิ่งไปตามลายวงจรในภาพหน้าเข้าสู่ระบบ — ภาพเคลื่อนไหวเดียวของหน้า
+ * สภาพปกติ (ไม่เล่นแอนิเมชัน) คือซ่อนเส้นสัญญาณ ลายวงจรเดิมยังอยู่ครบ
+ */
+@keyframes signal-pulse {
+  from {
+    stroke-dashoffset: 112;
+  }
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+
+.signal-pulse {
+  stroke-dasharray: 12 100;
+  stroke-dashoffset: 112;
+  animation: signal-pulse 2.8s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .signal-pulse {
+    animation: none;
+  }
 }

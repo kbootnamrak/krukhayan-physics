@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { SCHOOL_EMAIL_DOMAIN } from "@/lib/school";
 import { authErrorMessage } from "@/lib/auth-error";
 import AuthHashNotice from "@/app/AuthHashNotice";
+import { ChipMark, PhysicsHero } from "@/components/PhysicsArt";
 
 const AUTH_ERRORS: Record<string, string> = {
   link_invalid: "ลิงก์ในอีเมลหมดอายุหรือถูกใช้ไปแล้ว กรุณาขอลิงก์ใหม่",
@@ -65,10 +66,9 @@ function LoginForm() {
   return (
     <form
       onSubmit={handleLogin}
-      className="w-full max-w-sm bg-white p-8 rounded-xl shadow-sm border border-slate-200 space-y-4"
+      className="w-full max-w-sm bg-white p-7 rounded-sm border-2 border-porcelain space-y-4"
     >
-      <h1 className="text-xl font-semibold text-slate-800">KruKhayan Physics</h1>
-      <p className="text-sm text-slate-500">เข้าสู่ระบบ</p>
+      <h2 className="font-display text-xl font-semibold text-slate-800">เข้าสู่ระบบ</h2>
 
       {linkError && (
         <div className="bg-amber-50 border border-amber-300 rounded-md p-3 space-y-1">
@@ -83,14 +83,17 @@ function LoginForm() {
         type="button"
         onClick={handleGoogleLogin}
         disabled={loading}
-        className="w-full flex items-center justify-center gap-2 border border-slate-300 rounded-md py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+        className="w-full flex items-center justify-center gap-2 rounded-sm py-2.5 text-sm font-semibold bg-[oklch(50%_0.24_345)] text-white hover:bg-[oklch(55%_0.25_345)] disabled:opacity-50"
       >
+        {/* โลโก้ Google บนวงกลมขาว ให้เห็นชัดบนปุ่มสีชมพู */}
+        <span className="grid place-items-center size-6 rounded-full bg-[oklch(100%_0_0)]">
         <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden>
           <path fill="#4285F4" d="M45.1 24.5c0-1.6-.1-3.2-.4-4.7H24v8.9h11.8c-.5 2.7-2 5-4.4 6.6v5.5h7.1c4.1-3.8 6.6-9.4 6.6-16.3z" />
           <path fill="#34A853" d="M24 46c5.9 0 10.9-2 14.5-5.3l-7.1-5.5c-2 1.3-4.5 2.1-7.4 2.1-5.7 0-10.5-3.8-12.2-9H4.5v5.7C8.1 41.2 15.5 46 24 46z" />
           <path fill="#FBBC05" d="M11.8 28.3c-.4-1.3-.7-2.7-.7-4.3s.3-3 .7-4.3v-5.7H4.5A22 22 0 0 0 2 24c0 3.6.9 6.9 2.5 9.9l7.3-5.6z" />
           <path fill="#EA4335" d="M24 10.6c3.2 0 6.1 1.1 8.4 3.3l6.3-6.3C34.9 4.1 29.9 2 24 2 15.5 2 8.1 6.8 4.5 13.9l7.3 5.7c1.7-5.2 6.5-9 12.2-9z" />
         </svg>
+        </span>
         เข้าสู่ระบบด้วย Google ของโรงเรียน
       </button>
 
@@ -131,7 +134,7 @@ function LoginForm() {
       <button
         type="submit"
         disabled={loading}
-        className="w-full bg-slate-800 text-white rounded-md py-2 text-sm font-medium disabled:opacity-50"
+        className="w-full border-2 border-porcelain text-slate-800 rounded-sm py-2 text-sm font-semibold hover:bg-slate-100 disabled:opacity-50"
       >
         {loading ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
       </button>
@@ -148,12 +151,31 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-slate-50 px-4">
-      <AuthHashNotice />
-      {/* useSearchParams ต้องอยู่ใต้ Suspense ไม่งั้นทั้งหน้าจะกลายเป็น dynamic */}
-      <Suspense fallback={null}>
-        <LoginForm />
-      </Suspense>
+    // หน้าแรกที่ทุกคนเห็น: ภาพฟิสิกส์ไซเบอร์พังค์เต็มที่ฝั่งซ้าย ฟอร์มเข้าสู่ระบบฝั่งขวา (มือถือ: ภาพอยู่บน)
+    <div className="lg:min-h-screen lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+      <section className="relative flex flex-col justify-center gap-4 px-6 pt-8 lg:px-14 lg:py-12 overflow-hidden">
+        <div className="relative z-10 flex items-center gap-2.5 lg:absolute lg:top-8 lg:left-14">
+          <ChipMark />
+          <span className="font-display font-semibold uppercase tracking-[0.06em] text-[15px] text-slate-800">KruKhayan Physics</span>
+        </div>
+        <div className="relative z-10 space-y-2">
+          <h1 className="font-display text-4xl sm:text-5xl font-bold leading-[1.05] text-slate-800">
+            ห้องเรียน<span className="text-trace-magenta">ฟิสิกส์</span>
+            <br />
+            ของครูขยัน
+          </h1>
+          <p className="text-slate-600 max-w-md">คะแนน สื่อการสอน และข้อมูลจากเครื่องวัดจริง รวมไว้ในที่เดียว</p>
+        </div>
+        <PhysicsHero className="w-full max-w-[640px] h-auto -mx-2 max-lg:h-44" />
+      </section>
+
+      <section className="flex flex-col items-center justify-center gap-4 px-4 pt-2 pb-10 lg:py-12 lg:bg-slate-50/60 lg:border-l lg:border-slate-200">
+        <AuthHashNotice />
+        {/* useSearchParams ต้องอยู่ใต้ Suspense ไม่งั้นทั้งหน้าจะกลายเป็น dynamic */}
+        <Suspense fallback={null}>
+          <LoginForm />
+        </Suspense>
+      </section>
     </div>
   );
 }

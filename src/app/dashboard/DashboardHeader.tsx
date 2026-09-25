@@ -1,5 +1,6 @@
 import Link from "next/link";
 import ThemeToggle from "./ThemeToggle";
+import { ChipMark } from "@/components/PhysicsArt";
 
 /**
  * แถบด้านบนของทุกหน้าใน /dashboard
@@ -9,18 +10,13 @@ import ThemeToggle from "./ThemeToggle";
  */
 export default function DashboardHeader({ displayName }: { displayName: string | null }) {
   return (
-    <header className="bg-slate-50 border-b border-slate-200">
+    <header className="relative bg-slate-50 border-b border-slate-200">
+      {/* ลายทองแดงเรืองแสงเส้นบางใต้แถบบน — ส่วนเดียวของหน้างานที่มีแสงนีออน */}
+      <span aria-hidden className="neon-soft route-glow absolute inset-x-0 -bottom-px h-px bg-trace-cyan text-trace-cyan opacity-60" />
       <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
         <Link href="/dashboard" className="flex items-center gap-2.5 whitespace-nowrap group">
-          {/* สัญลักษณ์: สี่สายมาบรรจบที่สถานีเดียว */}
-          <svg viewBox="0 0 28 28" className="size-7 shrink-0" aria-hidden>
-            <path d="M3 9h7l4 5" stroke="var(--line-scarlet)" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M25 9h-7l-4 5" stroke="var(--line-cobalt)" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M3 19h7l4-5" stroke="var(--line-green)" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M25 19h-7l-4-5" stroke="var(--line-amber)" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            <circle cx="14" cy="14" r="4" fill="var(--c-slate-50)" stroke="var(--porcelain)" strokeWidth="2.2" />
-          </svg>
-          <span className="font-sign font-semibold uppercase tracking-[0.08em] text-[15px] text-slate-800 group-hover:text-slate-900">
+          <ChipMark />
+          <span className="font-display font-semibold uppercase tracking-[0.06em] text-[15px] text-slate-800 group-hover:text-slate-900">
             KruKhayan Physics
           </span>
         </Link>

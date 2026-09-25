@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { EXAM_TRACE, unitTrace } from "@/lib/traces";
+import { UnitGlyph } from "@/components/PhysicsArt";
 import { createClient } from "@/lib/supabase/client";
 import { calcGrade, DEFAULT_GRADE_SCALE, type GradeScale } from "@/lib/grade";
 import { dbErrorMessage } from "@/lib/db-error";
@@ -53,7 +55,7 @@ export default function ScoresPanel({
   const [exporting, setExporting] = useState(false);
 
   // แสดงเฉพาะช่องที่ตั้งคะแนนเต็มไว้จริง — หน่วยที่ไม่มี A ก็ไม่ต้องมีคอลัมน์ A ว่าง ๆ
-  const groups = useMemo((): { title: string; columns: Column[] }[] => {
+  const groups = useMemo((): { title: string; color: string; exam: boolean; columns: Column[] }[] => {
     const sorted = [...units].sort((a, b) => a.sort_order - b.sort_order);
     const unitGroups = sorted
       .map((u) => ({
@@ -63,7 +65,9 @@ export default function ScoresPanel({
           return c ? [{ sourceType: "unit_component", sourceId: c.id, max: Number(c.max_score), label: cat }] : [];
         }),
       }))
-      .filter((g) => g.columns.length > 0);
+      .filter((g) => g.columns.length > 0)
+      // สีของหน่วยตรงกับหน้าคะแนนของนักเรียน (หน่วยที่ 1 = สีแรก …)
+      .map((g, i) => ({ ...g, color: unitTrace(i), exam: false }));
 
     const examColumns = (["midterm", "final"] as const).flatMap((t): Column[] => {
       const e = exams.find((x) => x.exam_type === t);
@@ -71,12 +75,24 @@ export default function ScoresPanel({
         ? [{ sourceType: "exam", sourceId: e.id, max: Number(e.max_score), label: t === "midterm" ? "กลางภาค" : "ปลายภาค" }]
         : [];
     });
-    return examColumns.length > 0 ? [...unitGroups, { title: "สอบ", columns: examColumns }] : unitGroups;
+    return examColumns.length > 0
+      ? [...unitGroups, { title: "สอบ", color: EXAM_TRACE, exam: true, columns: examColumns }]
+      : unitGroups;
   }, [units, components, exams]);
 
   const columns: Column[] = groups.flatMap((g) => g.columns);
   // เส้นแบ่งแนวตั้งหน้าคอลัมน์แรกของแต่ละหน่วย ให้ดูออกว่าช่องไหนอยู่หน่วยไหน
   const groupStart = (c: Column) => groups.some((g) => g.columns[0] === c);
+  // พื้นจาง ๆ สีของหน่วยทั้งคอลัมน์ + เส้นคั่นหนาสีของหน่วย — ครูบอกว่าเดิมแยกหน่วยด้วยตายาก
+  const groupOf = (c: Column) => groups.find((g) => g.columns.includes(c))!;
+  const tint = (color: string, pct: number) => `color-mix(in oklch, ${color} ${pct}%, transparent)`;
+  const cellStyle = (c: Column): React.CSSProperties => {
+    const g = groupOf(c);
+    return {
+      background: tint(g.color, 7),
+      borderLeft: groupStart(c) ? `2px solid ${tint(g.color, 70)}` : undefined,
+    };
+  };
   const items = useMemo(() => gradedItems(components, exams), [components, exams]);
 
   // ชื่อจากรายชื่อที่ครูนำเข้าก่อน (ตรงกับทะเบียนโรงเรียน) ถ้าไม่มีค่อยใช้ชื่อในโปรไฟล์
@@ -209,8 +225,24 @@ export default function ScoresPanel({
                 นักเรียน
               </th>
               {groups.map((g) => (
-                <th key={g.title} colSpan={g.columns.length} className="p-2 text-center border-l border-slate-200 font-medium">
-                  {g.title}
+                <th
+                  key={g.title}
+                  colSpan={g.columns.length}
+                  className="px-2 pt-2 pb-1.5 text-center font-display font-semibold text-slate-800"
+                  style={{
+                    background: tint(g.color, 16),
+                    borderLeft: `2px solid ${tint(g.color, 70)}`,
+                    borderTop: `4px solid ${g.color}`,
+                  }}
+                >
+                  <span className="inline-flex items-center justify-center gap-1.5">
+                    {!g.exam && (
+                      <span className="shrink-0" style={{ color: g.color }}>
+                        <UnitGlyph title={g.title} className="size-4" />
+                      </span>
+                    )}
+                    {g.title}
+                  </span>
                 </th>
               ))}
               <th rowSpan={2} className="p-2 text-center border-l border-slate-200 align-bottom">
@@ -222,10 +254,7 @@ export default function ScoresPanel({
             </tr>
             <tr className="text-slate-400 text-xs">
               {columns.map((c) => (
-                <th
-                  key={c.sourceId}
-                  className={`p-1 text-center font-normal ${groupStart(c) ? "border-l border-slate-200" : ""}`}
-                >
+                <th key={c.sourceId} className="p-1 text-center font-normal" style={cellStyle(c)}>
                   {c.label}
                   <span className="block text-slate-300">/{fmt(c.max)}</span>
                 </th>
@@ -249,10 +278,7 @@ export default function ScoresPanel({
                     {placeLabel(en) && <span className="block text-slate-400 text-xs">{placeLabel(en)}</span>}
                   </td>
                   {columns.map((c, col) => (
-                    <td
-                      key={c.sourceId}
-                      className={`p-1 ${groupStart(c) ? "border-l border-slate-100" : ""}`}
-                    >
+                    <td key={c.sourceId} className="p-1" style={cellStyle(c)}>
                       <ScoreCell
                         row={row}
                         col={col}
