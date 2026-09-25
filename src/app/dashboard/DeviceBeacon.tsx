@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { getDeviceId } from "@/lib/device";
+import { getDeviceId, getDeviceModel } from "@/lib/device";
 
 /**
  * บันทึกว่านักเรียนเข้าเว็บจากเครื่องไหน (ฐานข้อมูลบันทึกไม่เกินชั่วโมงละครั้งต่อเครื่อง
@@ -12,9 +12,10 @@ export default function DeviceBeacon() {
   useEffect(() => {
     const id = getDeviceId();
     if (!id) return;
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
+      const model = await getDeviceModel();
       createClient()
-        .rpc("log_device", { p_device: id, p_kind: "visit" })
+        .rpc("log_device", { p_device: id, p_kind: "visit", p_model: model })
         .then(() => undefined, () => undefined);
     }, 0);
     return () => clearTimeout(timer);

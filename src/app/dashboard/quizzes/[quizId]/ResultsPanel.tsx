@@ -76,7 +76,7 @@ export default function ResultsPanel({
     const others = new Set<string>();
     for (const d of mine) usersOfDevice.get(d.device_id)?.forEach((u) => u !== studentId && others.add(u));
     return {
-      label: [...new Set(mine.map((d) => describeDevice(d.user_agent)))].join(", "),
+      label: [...new Set(mine.map((d) => describeDevice(d.user_agent, d.device_model)))].join(", "),
       sharedWith: [...others].map((u) => nameOfUser.get(u) ?? "บัญชีอื่น"),
     };
   }
