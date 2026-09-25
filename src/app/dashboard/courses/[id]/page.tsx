@@ -177,7 +177,7 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
           <Breadcrumbs items={[{ label: "หน้าหลัก", href: "/dashboard" }, coursesCrumb, { label: course.name }]} />
           {/* ชื่อวิชาเป็นป้ายชิป: กรอบสีกระเบื้อง ตัวอักษรหัวข้อทรงเหลี่ยม */}
           <h1 className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            <span className="rounded-sm border-2 border-porcelain px-3 py-0.5 font-display text-3xl font-semibold text-slate-800 leading-tight">
+            <span className="min-w-0 break-words rounded-sm border-2 border-porcelain px-3 py-0.5 font-display text-2xl font-semibold text-slate-800 leading-tight sm:text-3xl">
               {course.name}
             </span>
             {termText && <span className="text-base font-normal text-slate-500">{termText}</span>}
