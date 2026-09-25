@@ -12,8 +12,9 @@ import StudentsPanel, { type RosterRow } from "./StudentsPanel";
 import MaterialsPanel from "./MaterialsPanel";
 import GradeScalePanel from "./GradeScalePanel";
 import StudentRoute from "./StudentRoute";
+import QuizzesPanel from "./QuizzesPanel";
 
-type Tab = "units" | "scores" | "students" | "materials" | "grade";
+type Tab = "units" | "scores" | "students" | "materials" | "grade" | "quizzes";
 type CourseInfo = { code: string; name: string; year: number | null; semester: number | null };
 
 export default function CoursePage({ params }: { params: Promise<{ id: string }> }) {
@@ -164,6 +165,7 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
     { key: "units", label: "หน่วยการเรียนรู้", teacherOnly: true },
     { key: "scores", label: "กรอกคะแนน", teacherOnly: true },
     { key: "students", label: "นักเรียน", teacherOnly: true },
+    { key: "quizzes", label: "แบบทดสอบ" },
     { key: "materials", label: "สื่อการสอน" },
     { key: "grade", label: "คะแนนของฉัน" },
   ];
@@ -231,6 +233,16 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
 
         {activeTab === "students" && isTeacher && (
           <StudentsPanel courseId={courseId} roster={roster} onChanged={load} />
+        )}
+
+        {activeTab === "quizzes" && (
+          <QuizzesPanel
+            courseId={courseId}
+            isTeacher={isTeacher}
+            units={units}
+            myEnrollmentId={myEnrollment?.id ?? null}
+            myClassroom={myEnrollment?.class_roster?.classroom ?? null}
+          />
         )}
 
         {activeTab === "materials" && (

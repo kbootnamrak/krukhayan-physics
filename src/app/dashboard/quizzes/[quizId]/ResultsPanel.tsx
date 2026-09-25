@@ -1,0 +1,213 @@
+"use client";
+
+import { useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { dbErrorMessage } from "@/lib/db-error";
+import { downloadBlob } from "@/lib/download";
+import { compareRoster } from "@/lib/students/order";
+import type { Quiz, QuizAttempt } from "@/lib/quiz";
+
+export type RosterEnrollment = {
+  id: string;
+  student_id: string | null;
+  class_roster: { full_name: string; student_code: string; classroom: string | null; class_number: number | null } | null;
+};
+
+const th = new Intl.Collator("th", { numeric: true });
+
+/**
+ * ผลสอบรายคน กรองตามห้องได้ · ตรวจใหม่ (หลังแก้เฉลย/เก็บคนที่หมดเวลาแต่ไม่ได้กดส่ง)
+ * · ให้ทำใหม่ (ลบการทำของคนนั้น) · ดาวน์โหลด Excel
+ * คะแนนยังไม่เข้าช่อง K — ครูดูผลดิบแล้วค่อยตัดสินใจ
+ */
+export default function ResultsPanel({
+  quiz,
+  enrollments,
+  attempts,
+  loadedAt,
+  onChanged,
+}: {
+  quiz: Quiz;
+  enrollments: RosterEnrollment[];
+  attempts: QuizAttempt[];
+  /** เวลาตอนโหลดข้อมูล — ใช้ตัดสินว่าการทำไหนหมดเวลาแล้ว */
+  loadedAt: number;
+  onChanged: () => void;
+}) {
+  const supabase = createClient();
+  const [room, setRoom] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const rooms = [...new Set(enrollments.map((e) => e.class_roster?.classroom).filter((r): r is string => !!r))].sort(th.compare);
+  const now = loadedAt;
+
+  const rows = enrollments
+    .map((e) => ({
+      id: e.id,
+      full_name: e.class_roster?.full_name ?? "(ไม่มีชื่อ)",
+      student_code: e.class_roster?.student_code ?? null,
+      classroom: e.class_roster?.classroom ?? null,
+      class_number: e.class_roster?.class_number ?? null,
+      attempt: attempts.find((a) => a.enrollment_id === e.id) ?? null,
+    }))
+    .filter((r) => !room || r.classroom === room)
+    .sort(compareRoster);
+
+  const submitted = rows.filter((r) => r.attempt?.submitted_at);
+  const scores = submitted.map((r) => r.attempt!.score ?? 0);
+  const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
+  const expiredUnsent = attempts.filter((a) => !a.submitted_at && new Date(a.deadline_at).getTime() < now).length;
+
+  function statusOf(a: QuizAttempt | null) {
+    if (!a) return { text: "ยังไม่ทำ", cls: "text-slate-400" };
+    if (a.submitted_at) return { text: "ส่งแล้ว", cls: "text-green-700" };
+    if (new Date(a.deadline_at).getTime() < now) return { text: "หมดเวลา (รอตรวจ)", cls: "text-amber-700" };
+    return { text: "กำลังทำ", cls: "text-trace-cyan" };
+  }
+
+  async function regrade() {
+    setBusy(true);
+    const { data, error: e } = await supabase.rpc("quiz_regrade", { p_quiz: quiz.id });
+    setBusy(false);
+    if (e) return setError(dbErrorMessage(e));
+    setError(null);
+    setNotice(`ตรวจใหม่แล้ว ${data ?? 0} คน`);
+    onChanged();
+  }
+
+  async function reset(enrollmentId: string, name: string) {
+    if (!window.confirm(`ให้ ${name} ทำแบบทดสอบนี้ใหม่?\nคำตอบและคะแนนเดิมจะถูกลบ`)) return;
+    setBusy(true);
+    const { error: e } = await supabase.from("quiz_attempts").delete().eq("quiz_id", quiz.id).eq("enrollment_id", enrollmentId);
+    setBusy(false);
+    if (e) return setError(dbErrorMessage(e));
+    setError(null);
+    onChanged();
+  }
+
+  async function exportExcel() {
+    const XLSX = await import("xlsx");
+    const header = ["ห้อง", "เลขที่", "รหัสนักเรียน", "ชื่อ-สกุล", `คะแนน (เต็ม ${rows.find((r) => r.attempt)?.attempt?.max_score ?? ""})`, "สถานะ"];
+    const body = rows.map((r) => [
+      r.classroom ?? "",
+      r.class_number ?? "",
+      r.student_code ?? "",
+      r.full_name,
+      r.attempt?.submitted_at ? (r.attempt.score ?? "") : "",
+      statusOf(r.attempt).text,
+    ]);
+    const sheet = XLSX.utils.aoa_to_sheet([header, ...body]);
+    const book = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(book, sheet, "ผลสอบ");
+    const data = XLSX.write(book, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+    downloadBlob(
+      new Blob([data], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
+      `${quiz.title}${room ? ` ${room.replace("/", "-")}` : ""}.xlsx`
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        {rooms.length > 1 && (
+          <div role="group" aria-label="เลือกห้อง" className="flex flex-wrap gap-1">
+            {["", ...rooms].map((r) => (
+              <button
+                key={r || "all"}
+                type="button"
+                aria-pressed={room === r}
+                onClick={() => setRoom(r)}
+                className={`rounded-sm border-2 px-3 py-1.5 text-sm font-display font-semibold ${
+                  room === r ? "border-porcelain bg-porcelain text-[var(--c-slate-50)]" : "border-slate-300 text-slate-600 hover:border-slate-400"
+                }`}
+              >
+                {r || "ทุกห้อง"}
+              </button>
+            ))}
+          </div>
+        )}
+        <span className="ml-auto flex gap-2">
+          <button
+            type="button"
+            onClick={regrade}
+            disabled={busy}
+            title="ใช้หลังแก้เฉลย หรือเมื่อมีคนหมดเวลาแต่ยังไม่ได้กดส่ง"
+            className="text-sm border border-slate-300 rounded-sm px-3 py-1.5 text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+          >
+            ตรวจใหม่{expiredUnsent ? ` (${expiredUnsent} คนรอตรวจ)` : ""}
+          </button>
+          <button type="button" onClick={exportExcel} className="text-sm border border-slate-300 rounded-sm px-3 py-1.5 text-slate-700 hover:bg-slate-100">
+            ดาวน์โหลด Excel{room ? ` (${room})` : ""}
+          </button>
+        </span>
+      </div>
+
+      {error && (
+        <p role="alert" className="text-sm text-red-800 bg-red-50 border border-red-300 rounded-sm px-3 py-2">
+          {error}
+        </p>
+      )}
+      {notice && <p className="text-sm text-green-700" aria-live="polite">{notice}</p>}
+
+      <p className="text-sm text-slate-600">
+        ส่งแล้ว <span className="font-num tnum font-semibold text-slate-800">{submitted.length}</span> จาก{" "}
+        <span className="font-num tnum">{rows.length}</span> คน
+        {avg !== null && (
+          <>
+            {" "}
+            · เฉลี่ย <span className="font-num tnum font-semibold text-slate-800">{avg.toFixed(2)}</span> · สูงสุด{" "}
+            <span className="font-num tnum">{Math.max(...scores)}</span> · ต่ำสุด <span className="font-num tnum">{Math.min(...scores)}</span>
+          </>
+        )}
+      </p>
+
+      <div className="overflow-x-auto bg-white border border-slate-200 rounded-sm">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-slate-500 border-b border-slate-200">
+              <th className="p-2 font-medium">นักเรียน</th>
+              <th className="p-2 font-medium">สถานะ</th>
+              <th className="p-2 font-medium text-right">คะแนน</th>
+              <th className="p-2" />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => {
+              const st = statusOf(r.attempt);
+              return (
+                <tr key={r.id} className="border-t border-slate-100">
+                  <td className="p-2">
+                    <span className="text-slate-800">{r.full_name}</span>
+                    <span className="block text-xs text-slate-400">
+                      {[r.classroom, r.class_number != null ? `เลขที่ ${r.class_number}` : null, r.student_code].filter(Boolean).join(" · ")}
+                    </span>
+                  </td>
+                  <td className={`p-2 ${st.cls}`}>{st.text}</td>
+                  <td className="p-2 text-right font-num tnum whitespace-nowrap">
+                    {r.attempt?.submitted_at ? (
+                      <>
+                        <span className="text-lg font-semibold text-slate-800">{r.attempt.score ?? "–"}</span>
+                        <span className="text-slate-500"> / {r.attempt.max_score}</span>
+                      </>
+                    ) : (
+                      <span className="text-slate-400">–</span>
+                    )}
+                  </td>
+                  <td className="p-2 text-right">
+                    {r.attempt && (
+                      <button type="button" disabled={busy} onClick={() => reset(r.id, r.full_name)} className="text-xs text-slate-500 hover:text-red-700 hover:underline">
+                        ให้ทำใหม่
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
