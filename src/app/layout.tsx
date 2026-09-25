@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Anuphan, Barlow_Semi_Condensed, Chakra_Petch } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
@@ -27,6 +27,13 @@ const barlow = Barlow_Semi_Condensed({
 export const metadata: Metadata = {
   title: "KruKhayan Physics",
   description: "เว็บไซต์จัดการเรียนการสอนวิชาฟิสิกส์ - ครูขยัน",
+  // ชื่อใต้ไอคอนตอน "เพิ่มลงหน้าจอหลัก" บน iPhone (Android ใช้ short_name ใน manifest)
+  appleWebApp: { capable: true, title: "ครูขยัน ฟิสิกส์", statusBarStyle: "black-translucent" },
+};
+
+// สีแถบด้านบนของเบราว์เซอร์มือถือ ให้กลืนกับพื้นกรมท่าของเว็บ
+export const viewport: Viewport = {
+  themeColor: "#0b1330",
 };
 
 // ตั้งธีมก่อนหน้าแสดงผล กันหน้ากระพริบจากมืดเป็นสว่าง — ค่าเริ่มต้นคือธีมมืด
