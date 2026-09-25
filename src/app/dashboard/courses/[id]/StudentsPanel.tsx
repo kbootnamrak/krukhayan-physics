@@ -49,7 +49,7 @@ export default function StudentsPanel({
     if (!ids.length) return setDevices([]);
     const { data } = await supabase
       .from("device_events")
-      .select("user_id, device_id, user_agent, ip, kind, quiz_id, at")
+      .select("user_id, device_id, user_agent, ip, kind, quiz_id, at, device_model")
       .in("user_id", ids)
       .order("at", { ascending: false })
       .limit(5000);
@@ -73,8 +73,11 @@ export default function StudentsPanel({
     for (const d of devices) {
       if (d.user_id !== userId) continue;
       const cur = byDevice.get(d.device_id);
-      if (cur) cur.count++;
-      else byDevice.set(d.device_id, { device_id: d.device_id, label: describeDevice(d.user_agent), last: d.at, ip: d.ip, count: 1 });
+      if (cur) {
+        cur.count++;
+        // รุ่นอาจมาทีหลัง (บางแถวบันทึกก่อนมีรุ่น) — ใช้ป้ายที่ละเอียดกว่า
+        if (d.device_model && !cur.label.includes(d.device_model)) cur.label = describeDevice(d.user_agent, d.device_model);
+      } else byDevice.set(d.device_id, { device_id: d.device_id, label: describeDevice(d.user_agent, d.device_model), last: d.at, ip: d.ip, count: 1 });
     }
     return [...byDevice.values()];
   }

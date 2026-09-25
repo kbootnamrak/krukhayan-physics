@@ -5,7 +5,7 @@ import { use, useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { CHOICE_LABELS, quizErrorMessage, type MyAttempt, type SubmitReason, type SubmittedResult, type TakePayload } from "@/lib/quiz";
 import QuizText from "@/components/QuizText";
-import { getDeviceId } from "@/lib/device";
+import { getDeviceId, getDeviceModel } from "@/lib/device";
 
 type Done = { kind: "done"; score: number | null; max: number; reason: SubmitReason | null; released: boolean; courseId: string; title: string };
 type Phase =
@@ -41,7 +41,11 @@ export default function TakeQuizPage({ params }: { params: Promise<{ quizId: str
       setPhase({ kind: "taking", data: res, courseId });
       // บันทึกเครื่องที่ใช้ทำชุดนี้ (ครูเห็นในแท็บผลสอบ ถ้าหลายคนทำบนเครื่องเดียวกันจะมีธงเตือน)
       const device = getDeviceId();
-      if (device) supabase.rpc("log_device", { p_device: device, p_kind: "quiz", p_quiz: quizId }).then(() => undefined, () => undefined);
+      if (device) {
+        getDeviceModel().then((model) =>
+          supabase.rpc("log_device", { p_device: device, p_kind: "quiz", p_quiz: quizId, p_model: model }).then(() => undefined, () => undefined)
+        );
+      }
     },
     [quizId, supabase]
   );

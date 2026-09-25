@@ -63,7 +63,7 @@ export default function QuizPage({ params }: { params: Promise<{ quizId: string 
     ]);
     const { data: dev } = await supabase
       .from("device_events")
-      .select("user_id, device_id, user_agent, ip, kind, quiz_id, at")
+      .select("user_id, device_id, user_agent, ip, kind, quiz_id, at, device_model")
       .eq("quiz_id", quizId);
     setDevices((dev as DeviceEvent[]) ?? []);
     const ids = ((qqRes.data as QuizQuestion[]) ?? []).map((x) => x.id);
