@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { SCHOOL_EMAIL_DOMAIN } from "@/lib/school";
 import { authErrorMessage } from "@/lib/auth-error";
+import { pinEmail } from "@/lib/students/pin";
 import AuthHashNotice from "@/app/AuthHashNotice";
 import { ChipMark, PhysicsHero } from "@/components/PhysicsArt";
 
@@ -149,6 +150,85 @@ function LoginForm() {
   );
 }
 
+/**
+ * สำหรับนักเรียนที่เข้าด้วยอีเมลโรงเรียนไม่ได้ (ลืมรหัสผ่าน / ยังไม่มีบัญชี)
+ * ครูสร้าง PIN ให้ในแท็บ "นักเรียน" — ที่นี่พิมพ์รหัสนักเรียน + PIN
+ */
+function PinLoginForm() {
+  const router = useRouter();
+  const [code, setCode] = useState("");
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function handlePin(e: React.FormEvent) {
+    e.preventDefault();
+    const c = code.trim();
+    const p = pin.trim();
+    if (!/^\d+$/.test(c)) return setError("รหัสนักเรียนต้องเป็นตัวเลข");
+    if (!/^\d{6}$/.test(p)) return setError("PIN ต้องเป็นตัวเลข 6 หลัก");
+    setLoading(true);
+    setError(null);
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithPassword({ email: pinEmail(c), password: p });
+    if (error) {
+      setLoading(false);
+      return setError(
+        error.message.includes("Invalid login credentials")
+          ? "รหัสนักเรียนหรือ PIN ไม่ถูกต้อง ถ้าจำ PIN ไม่ได้ ให้ขอ PIN ใหม่จากครู"
+          : authErrorMessage(error)
+      );
+    }
+    // ผูกกับรายชื่อวิชาที่ครูนำเข้าทีหลัง (ถ้ามี)
+    await fetch("/api/students/link", { method: "POST" }).catch(() => null);
+    router.push("/dashboard");
+    router.refresh();
+  }
+
+  return (
+    <details className="w-full max-w-sm group">
+      <summary className="cursor-pointer list-none text-center text-sm text-slate-600 hover:text-slate-800">
+        นักเรียนที่เข้าอีเมลโรงเรียนไม่ได้ <span className="underline underline-offset-2">เข้าด้วยรหัสนักเรียน + PIN</span>
+      </summary>
+      <form onSubmit={handlePin} className="mt-3 bg-white p-5 rounded-sm border-2 border-slate-300 space-y-3">
+        <p className="text-sm text-slate-600">ขอ PIN 6 หลักจากครูผู้สอน แล้วกรอกด้านล่าง</p>
+        <div className="space-y-1">
+          <label htmlFor="pin-code" className="text-sm text-slate-600">รหัสนักเรียน</label>
+          <input
+            id="pin-code"
+            inputMode="numeric"
+            autoComplete="username"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            className="w-full border border-slate-300 rounded-sm px-3 py-2 text-sm font-num tnum"
+          />
+        </div>
+        <div className="space-y-1">
+          <label htmlFor="pin-pin" className="text-sm text-slate-600">PIN 6 หลัก</label>
+          <input
+            id="pin-pin"
+            type="password"
+            inputMode="numeric"
+            autoComplete="current-password"
+            maxLength={6}
+            value={pin}
+            onChange={(e) => setPin(e.target.value)}
+            className="w-full border border-slate-300 rounded-sm px-3 py-2 text-sm font-num tnum tracking-[0.3em]"
+          />
+        </div>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full border-2 border-porcelain text-slate-800 rounded-sm py-2 text-sm font-semibold hover:bg-slate-100 disabled:opacity-50"
+        >
+          {loading ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบด้วย PIN"}
+        </button>
+      </form>
+    </details>
+  );
+}
+
 export default function LoginPage() {
   return (
     // หน้าแรกที่ทุกคนเห็น: ภาพฟิสิกส์ไซเบอร์พังค์เต็มที่ฝั่งซ้าย ฟอร์มเข้าสู่ระบบฝั่งขวา (มือถือ: ภาพอยู่บน)
@@ -179,6 +259,7 @@ export default function LoginPage() {
         <Suspense fallback={null}>
           <LoginForm />
         </Suspense>
+        <PinLoginForm />
       </section>
     </div>
   );

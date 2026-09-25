@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase/client";
 import { dbErrorMessage } from "@/lib/db-error";
@@ -32,7 +32,48 @@ export default function StudentsPanel({
   const [log, setLog] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const signedIn = roster.filter((r) => r.claimed_by !== null).length;
+  // ตัวกรองห้อง ("" = ทุกห้อง)
+  const [room, setRoom] = useState("");
+  const th = new Intl.Collator("th", { numeric: true });
+  const rooms = [...new Set(roster.map((r) => r.classroom).filter((c): c is string => !!c))].sort(th.compare);
+  const activeRoom = rooms.includes(room) ? room : "";
+  const shown = activeRoom ? roster.filter((r) => r.classroom === activeRoom) : roster;
+  const signedIn = shown.filter((r) => r.claimed_by !== null).length;
+
+  // PIN สำหรับนักเรียนที่เข้าอีเมลโรงเรียนไม่ได้
+  const [pinRosterIds, setPinRosterIds] = useState<Set<string>>(new Set());
+  const [issued, setIssued] = useState<{ name: string; studentCode: string; pin: string } | null>(null);
+  const [pinBusy, setPinBusy] = useState<string | null>(null);
+
+  const loadPins = useCallback(async () => {
+    const res = await fetch(`/api/students/pin?courseId=${encodeURIComponent(courseId)}`);
+    const json = await res.json().catch(() => null);
+    if (res.ok && json?.rosterIds) setPinRosterIds(new Set(json.rosterIds as string[]));
+  }, [courseId]);
+
+  useEffect(() => {
+    const timer = setTimeout(loadPins, 0);
+    return () => clearTimeout(timer);
+  }, [loadPins, roster]);
+
+  async function pinAction(r: RosterRow, action: "issue" | "revoke") {
+    if (action === "issue" && pinRosterIds.has(r.id) && !window.confirm(`สร้าง PIN ใหม่ให้ ${r.full_name}?\nPIN เดิมจะใช้ไม่ได้ทันที`)) return;
+    if (action === "revoke" && !window.confirm(`ยกเลิก PIN ของ ${r.full_name}?\nนักเรียนจะเข้าด้วย PIN ไม่ได้อีก (คะแนนยังอยู่ครบ)`)) return;
+    setPinBusy(r.id);
+    setError(null);
+    const res = await fetch("/api/students/pin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rosterId: r.id, action }),
+    });
+    const json = await res.json().catch(() => null);
+    setPinBusy(null);
+    if (!res.ok) return setError(json?.error ?? "ทำรายการไม่สำเร็จ ลองใหม่อีกครั้ง");
+    if (action === "issue") setIssued({ name: json.name, studentCode: json.studentCode, pin: json.pin });
+    else setIssued(null);
+    await loadPins();
+    onChanged();
+  }
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -166,11 +207,32 @@ export default function StudentsPanel({
         </p>
       )}
 
-      {roster.length > 0 && (
+      {rooms.length > 1 && (
+        <div role="group" aria-label="เลือกห้อง" className="flex flex-wrap gap-1">
+          {[{ name: "", count: roster.length }, ...rooms.map((name) => ({ name, count: roster.filter((r) => r.classroom === name).length }))].map((r) => {
+            const on = activeRoom === r.name;
+            return (
+              <button
+                key={r.name || "all"}
+                type="button"
+                aria-pressed={on}
+                onClick={() => setRoom(r.name)}
+                className={`rounded-sm border-2 px-3 py-1.5 text-sm font-display font-semibold ${
+                  on ? "border-porcelain bg-porcelain text-[var(--c-slate-50)]" : "border-slate-300 text-slate-600 hover:border-slate-400 hover:text-slate-800"
+                }`}
+              >
+                {r.name || "ทุกห้อง"} <span className={`font-num tnum font-medium ${on ? "" : "text-slate-400"}`}>{r.count}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {shown.length > 0 && (
         <p className="text-sm text-slate-600">
-          เข้าระบบแล้ว <b className="text-slate-800">{signedIn}</b> จาก{" "}
-          <b className="text-slate-800">{roster.length}</b> คน
-          {signedIn < roster.length && (
+          {activeRoom && <>{activeRoom} · </>}เข้าระบบแล้ว <b className="text-slate-800">{signedIn}</b> จาก{" "}
+          <b className="text-slate-800">{shown.length}</b> คน
+          {signedIn < shown.length && (
             <span className="text-slate-400">
               {" "}
               — คนที่ยังไม่เข้ายังไม่เห็นคะแนนของตัวเอง
@@ -179,11 +241,36 @@ export default function StudentsPanel({
         </p>
       )}
 
+      {/* PIN ที่เพิ่งสร้าง — แสดงครั้งเดียว ระบบไม่เก็บตัว PIN ไว้ */}
+      {issued && (
+        <div role="status" className="rounded-sm border-2 border-porcelain bg-white p-4 space-y-2">
+          <p className="text-sm text-slate-600">
+            บอกนักเรียน <b className="text-slate-800">{issued.name}</b> ให้เข้าหน้าเข้าสู่ระบบ → &quot;เข้าด้วยรหัสนักเรียน + PIN&quot;
+          </p>
+          <div className="flex flex-wrap items-end gap-6">
+            <p>
+              <span className="block text-xs text-slate-500">รหัสนักเรียน</span>
+              <span className="font-num tnum text-2xl font-semibold text-slate-800">{issued.studentCode}</span>
+            </p>
+            <p>
+              <span className="block text-xs text-slate-500">PIN</span>
+              <span className="font-num tnum text-4xl font-bold tracking-[0.2em] text-slate-800 select-all">{issued.pin}</span>
+            </p>
+          </div>
+          <p className="text-xs text-amber-800">
+            จด PIN นี้ให้นักเรียนตอนนี้ — ปิดกล่องนี้แล้วดูซ้ำไม่ได้ (ถ้าลืม กดสร้าง PIN ใหม่ได้)
+          </p>
+          <button type="button" onClick={() => setIssued(null)} className="text-sm text-slate-600 underline underline-offset-2">
+            ปิด
+          </button>
+        </div>
+      )}
+
       <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100">
         {roster.length === 0 && (
           <p className="p-4 text-sm text-slate-400">ยังไม่มีรายชื่อนักเรียนในวิชานี้</p>
         )}
-        {[...roster].sort(compareRoster).map((r) => (
+        {[...shown].sort(compareRoster).map((r) => (
           <div key={r.id} className="p-3 text-sm flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-slate-700">{r.full_name}</p>
@@ -200,8 +287,27 @@ export default function StudentsPanel({
                     : "bg-slate-50 text-slate-500 border border-slate-200"
                 }`}
               >
-                {r.claimed_by ? "● เข้าระบบแล้ว" : "○ ยังไม่เคยเข้า"}
+                {pinRosterIds.has(r.id) ? "● เข้าด้วย PIN" : r.claimed_by ? "● เข้าระบบแล้ว" : "○ ยังไม่เคยเข้า"}
               </span>
+              {/* PIN: สร้างให้คนที่ยังไม่เคยเข้า หรือเปลี่ยน/ยกเลิกของคนที่ใช้ PIN อยู่ (คนที่เข้าด้วย Google แล้วไม่ต้องใช้) */}
+              {(!r.claimed_by || pinRosterIds.has(r.id)) && (
+                <button
+                  onClick={() => pinAction(r, "issue")}
+                  disabled={busy || pinBusy === r.id}
+                  className="text-xs text-slate-600 border border-slate-300 rounded-sm px-2 py-1 hover:border-slate-500 hover:text-slate-800 disabled:opacity-50 whitespace-nowrap"
+                >
+                  {pinBusy === r.id ? "..." : pinRosterIds.has(r.id) ? "PIN ใหม่" : "สร้าง PIN"}
+                </button>
+              )}
+              {pinRosterIds.has(r.id) && (
+                <button
+                  onClick={() => pinAction(r, "revoke")}
+                  disabled={busy || pinBusy === r.id}
+                  className="text-xs text-slate-500 hover:text-red-700 hover:underline disabled:opacity-50 whitespace-nowrap"
+                >
+                  ยกเลิก PIN
+                </button>
+              )}
               <button
                 onClick={() => removeStudent(r)}
                 disabled={busy}
