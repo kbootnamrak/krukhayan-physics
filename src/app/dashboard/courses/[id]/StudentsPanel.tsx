@@ -8,6 +8,41 @@ import { SCHOOL_EMAIL_DOMAIN } from "@/lib/school";
 import { parseRoster } from "@/lib/students/parse-roster";
 import { compareRoster, placeLabel } from "@/lib/students/order";
 import { describeDevice, type DeviceEvent } from "@/lib/device";
+import { downloadBlob } from "@/lib/download";
+
+/**
+ * แบบฟอร์มรายชื่อเปล่า — ชีตแรกมีแค่หัวตาราง (ตัวนำเข้าอ่านชีตแรก ตัวอย่างจึงอยู่อีกชีต ไม่ถูกนำเข้าไปด้วย)
+ * หัวคอลัมน์ตรงกับที่ parseRoster รู้จัก
+ */
+function downloadRosterTemplate() {
+  const header = ["รหัสนักเรียน", "คำนำหน้า", "ชื่อ", "นามสกุล", "ระดับชั้น", "ห้อง", "เลขที่"];
+  const sheet = XLSX.utils.aoa_to_sheet([header]);
+  sheet["!cols"] = [{ wch: 14 }, { wch: 10 }, { wch: 18 }, { wch: 20 }, { wch: 10 }, { wch: 6 }, { wch: 7 }];
+  const example = XLSX.utils.aoa_to_sheet([
+    header,
+    ["26501", "นาย", "สมชาย", "ใจดี", "ม.6", "1", 1],
+    ["26502", "นางสาว", "สมหญิง", "รักเรียน", "ม.6", "1", 2],
+    ["26540", "นาย", "ธนากร", "มั่นคง", "ม.6", "2", 1],
+  ]);
+  example["!cols"] = sheet["!cols"];
+  const help = XLSX.utils.aoa_to_sheet([
+    ["วิธีใช้แบบฟอร์มรายชื่อนักเรียน"],
+    [""],
+    ['1. กรอกรายชื่อในชีต "รายชื่อ" (ชีตแรก) หนึ่งแถวต่อหนึ่งคน — ดูตัวอย่างในชีต "ตัวอย่าง"'],
+    ["2. ต้องมีรหัสนักเรียน ชื่อ และนามสกุล · ระดับชั้น/ห้อง/เลขที่ ใส่แล้วระบบจะแยกห้องและเรียงตามเลขที่ให้"],
+    ['3. ห้อง: ระดับชั้น "ม.6" + ห้อง "1" จะกลายเป็น "ม.6/1"'],
+    ["4. ถ้ารหัสนักเรียนขึ้นต้นด้วย 0 ให้จัดรูปแบบคอลัมน์เป็นข้อความก่อนพิมพ์ ไม่งั้น Excel จะตัดเลข 0 ทิ้ง"],
+    ["5. นำเข้าซ้ำได้ — คนเดิมจะอัปเดตชื่อ/ห้อง ไม่เพิ่มซ้ำ"],
+    ["6. ไฟล์ที่ส่งออกจากระบบทะเบียนโรงเรียนนำเข้าได้เลย ไม่ต้องย้ายมาใส่แบบฟอร์มนี้"],
+  ]);
+  help["!cols"] = [{ wch: 100 }];
+  const book = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(book, sheet, "รายชื่อ");
+  XLSX.utils.book_append_sheet(book, example, "ตัวอย่าง");
+  XLSX.utils.book_append_sheet(book, help, "วิธีใช้");
+  const data = XLSX.write(book, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+  downloadBlob(new Blob([data], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), "แบบฟอร์มรายชื่อนักเรียน.xlsx");
+}
 
 export type RosterRow = {
   id: string;
@@ -226,6 +261,16 @@ export default function StudentsPanel({
           aria-label="เลือกไฟล์ Excel รายชื่อนักเรียน"
           className="block w-full text-sm text-slate-500 file:mr-3 file:min-h-11 file:rounded-sm file:border-2 file:border-porcelain file:bg-transparent file:px-4 file:font-display file:font-semibold file:text-slate-800 hover:file:bg-slate-100 disabled:opacity-50 sm:file:min-h-9"
         />
+        <p className="text-sm text-slate-500">
+          ไม่มีไฟล์จากระบบทะเบียน?{" "}
+          <button
+            type="button"
+            onClick={downloadRosterTemplate}
+            className="inline-flex min-h-11 items-center gap-1 font-semibold text-slate-800 underline underline-offset-2 sm:min-h-0"
+          >
+            ดาวน์โหลดแบบฟอร์มรายชื่อ
+          </button>
+        </p>
         {busy && <p className="text-sm text-slate-400">กำลังทำงาน...</p>}
         {log.length > 0 && (
           <div className="space-y-1">

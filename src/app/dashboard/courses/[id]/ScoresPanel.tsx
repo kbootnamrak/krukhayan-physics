@@ -9,6 +9,7 @@ import { dbErrorMessage } from "@/lib/db-error";
 import { downloadBlob } from "@/lib/download";
 import { compareRoster, placeLabel } from "@/lib/students/order";
 import { fmt, gradedItems, scoreLookup, summarize, type SourceType } from "@/lib/scores";
+import ScoreImport from "./ScoreImport";
 
 type Category = "K" | "P" | "A";
 type Unit = { id: string; title: string; sort_order: number };
@@ -56,6 +57,8 @@ export default function ScoresPanel({
   // ตัวกรองห้อง ("" = ทุกห้อง) และคำค้นหา (ชื่อ / รหัส / เลขที่)
   const [room, setRoom] = useState("");
   const [query, setQuery] = useState("");
+  // เพิ่มทุกครั้งที่นำเข้าจาก Excel — ช่องกรอกคะแนนสร้างใหม่ให้แสดงค่าที่เพิ่งนำเข้า
+  const [importVersion, setImportVersion] = useState(0);
 
   // แสดงเฉพาะช่องที่ตั้งคะแนนเต็มไว้จริง — หน่วยที่ไม่มี A ก็ไม่ต้องมีคอลัมน์ A ว่าง ๆ
   const groups = useMemo((): { title: string; color: string; exam: boolean; columns: Column[] }[] => {
@@ -295,6 +298,19 @@ export default function ScoresPanel({
           />
         </div>
       </div>
+      <ScoreImport
+        groups={groups}
+        students={students}
+        templateStudents={inRoom}
+        scores={scores}
+        activeRoom={activeRoom}
+        fileName={exportName}
+        onImported={(rows) => {
+          rows.forEach(onScoreSaved);
+          setImportVersion((v) => v + 1);
+        }}
+      />
+
       {(activeRoom || q) && (
         <p className="text-xs text-slate-500" aria-live="polite">
           แสดง <span className="font-num tnum">{visible.length}</span> จาก <span className="font-num tnum">{students.length}</span> คน
@@ -393,6 +409,7 @@ export default function ScoresPanel({
                   {columns.map((c, col) => (
                     <td key={c.sourceId} className="p-1" style={cellStyle(c)}>
                       <ScoreCell
+                        key={importVersion}
                         row={row}
                         col={col}
                         enrollmentId={en.id}
