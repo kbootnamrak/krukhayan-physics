@@ -93,18 +93,25 @@ export default function GradeScalePanel({
     <section className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <p className="font-medium text-slate-700 text-sm">เกณฑ์ตัดเกรด</p>
+          <p className="font-display font-semibold text-slate-800">เกณฑ์ตัดเกรด</p>
           <p className="text-xs text-slate-500">
             {isCustom ? "ใช้เกณฑ์ที่ตั้งเองสำหรับวิชานี้" : "ใช้เกณฑ์มาตรฐาน — 80% ขึ้นไปได้ 4 ลดลงทีละ 5%"}
           </p>
         </div>
         {!editing && (
-          <div className="flex gap-3 text-sm">
-            <button onClick={startEdit} className="text-slate-600 hover:text-slate-800 hover:underline">
+          <div className="flex w-full gap-2 text-sm sm:w-auto sm:gap-3">
+            <button
+              onClick={startEdit}
+              className="min-h-11 flex-1 rounded-md border border-slate-300 px-3 text-slate-700 hover:border-slate-500 sm:min-h-0 sm:flex-none sm:border-0 sm:px-0 sm:text-slate-600 sm:hover:underline"
+            >
               ปรับเกณฑ์
             </button>
             {isCustom && (
-              <button onClick={resetToDefault} disabled={busy} className="text-slate-500 hover:text-slate-800 hover:underline">
+              <button
+                onClick={resetToDefault}
+                disabled={busy}
+                className="min-h-11 flex-1 rounded-md border border-slate-300 px-3 text-slate-500 hover:border-slate-500 sm:min-h-0 sm:flex-none sm:border-0 sm:px-0 sm:hover:underline"
+              >
                 ใช้เกณฑ์มาตรฐาน
               </button>
             )}
@@ -126,7 +133,7 @@ export default function GradeScalePanel({
                     inputMode="decimal"
                     disabled={g === "0"}
                     aria-label={`เกรด ${g} ตั้งแต่กี่เปอร์เซ็นต์`}
-                    className="w-full border border-slate-300 rounded px-1.5 py-1 text-sm text-slate-800 disabled:bg-slate-50"
+                    className="w-full min-w-0 border border-slate-300 rounded px-1.5 py-2 text-base text-center text-slate-800 disabled:bg-slate-50 sm:py-1 sm:text-sm"
                   />
                   <span aria-hidden>%</span>
                 </span>
@@ -137,11 +144,15 @@ export default function GradeScalePanel({
             เปลี่ยนแล้วเกรดของนักเรียนทุกคนในวิชานี้จะคำนวณใหม่ทันที ทั้งในตารางครูและหน้าของนักเรียน
           </p>
           {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-          <div className="flex gap-3">
-            <button disabled={busy} className="bg-slate-800 text-white rounded-md px-4 py-1.5 text-sm disabled:opacity-50">
+          <div className="flex gap-2 sm:gap-3">
+            <button disabled={busy} className="min-h-11 flex-1 bg-slate-800 text-white rounded-md px-4 text-sm font-semibold disabled:opacity-50 sm:min-h-9 sm:flex-none">
               {busy ? "กำลังบันทึก..." : "บันทึกเกณฑ์"}
             </button>
-            <button type="button" onClick={() => setEditing(null)} className="text-sm text-slate-500 hover:underline">
+            <button
+              type="button"
+              onClick={() => setEditing(null)}
+              className="min-h-11 flex-1 rounded-md border border-slate-300 px-3 text-sm text-slate-600 sm:min-h-0 sm:flex-none sm:border-0 sm:hover:underline"
+            >
               ยกเลิก
             </button>
           </div>
