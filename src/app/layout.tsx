@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Anuphan, Barlow_Semi_Condensed, Chakra_Petch } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
+import PressFx from "@/components/PressFx";
 
 const anuphan = Anuphan({
   subsets: ["thai", "latin"],
@@ -49,6 +50,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col font-sans">
         {/* beforeInteractive = ฝังใน HTML แรกจากเซิร์ฟเวอร์ ทำงานก่อนโค้ดของ Next */}
         <Script id="theme" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        <PressFx />
         {children}
       </body>
     </html>

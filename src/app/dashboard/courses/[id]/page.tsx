@@ -190,7 +190,7 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
           </p>
         )}
 
-        <div role="tablist" className="flex gap-1 border-b border-slate-200 overflow-x-auto">
+        <div role="tablist" className="flex gap-1 border-b border-slate-200 overflow-x-auto" style={{ "--neon": "var(--trace-magenta)" } as React.CSSProperties}>
           {tabs
             .filter((t) => !t.teacherOnly || isTeacher)
             .filter((t) => t.key !== "grade" || !isTeacher)
