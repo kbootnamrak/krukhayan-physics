@@ -4,6 +4,8 @@ import { useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { dbErrorMessage } from "@/lib/db-error";
 import { fmt } from "@/lib/scores";
+import { EXAM_TRACE, unitTrace } from "@/lib/traces";
+import { UnitGlyph } from "@/components/PhysicsArt";
 
 type Category = "K" | "P" | "A";
 type Unit = { id: string; title: string; sort_order: number };
@@ -12,6 +14,13 @@ type Exam = { id: string; exam_type: "midterm" | "final"; max_score: number };
 
 const CATEGORIES: Category[] = ["K", "P", "A"];
 const EXAM_LABEL = { midterm: "กลางภาค", final: "ปลายภาค" } as const;
+
+// ตัวอักษร 16px บนมือถือ — เล็กกว่านี้ iPhone จะซูมหน้าเองตอนแตะช่อง
+const TEXT_INPUT = "border border-slate-300 rounded-md px-3 py-2.5 text-base bg-white sm:py-2 sm:text-sm";
+const PRIMARY = "min-h-11 bg-slate-800 text-white rounded-md px-4 text-sm font-semibold disabled:opacity-50 sm:min-h-9";
+// ปุ่มจัดการหน่วย: มือถือสูง 44px กดง่าย · จอกว้างเป็นตัวหนังสือเล็กเหมือนเดิม
+const UNIT_ACTION =
+  "grid min-h-11 min-w-11 place-items-center rounded-md border border-slate-200 px-3 text-slate-500 hover:border-slate-400 hover:text-slate-800 disabled:opacity-30 sm:min-h-0 sm:min-w-0 sm:border-0 sm:px-0";
 
 type CommitResult = { error?: string; revert?: boolean };
 
@@ -216,27 +225,31 @@ export default function UnitsPanel({
     <div className="space-y-6">
       <form onSubmit={addUnit} className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
         <p className="text-sm font-medium text-slate-700">เพิ่มหน่วยการเรียนรู้</p>
-        <div className="flex gap-2 flex-wrap items-end">
+        {/* มือถือ: ชื่อหน่วยเต็มแถว → K P A สามช่องเท่ากัน → ปุ่มเต็มกว้าง */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="ชื่อหน่วย เช่น หน่วยที่ 1 การเคลื่อนที่"
-            className="flex-1 min-w-[220px] border border-slate-300 rounded-md px-3 py-2 text-sm"
+            aria-label="ชื่อหน่วย"
+            className={`${TEXT_INPUT} sm:flex-1 sm:min-w-[220px]`}
           />
-          {CATEGORIES.map((cat) => (
-            <label key={cat} className="text-sm text-slate-600 flex items-center gap-1">
-              {cat}
-              <input
-                type="number"
-                min="0"
-                step="any"
-                value={newMax[cat]}
-                onChange={(e) => setNewMax((m) => ({ ...m, [cat]: e.target.value }))}
-                className="w-16 border border-slate-300 rounded-md px-2 py-2 text-sm"
-              />
-            </label>
-          ))}
-          <button disabled={adding} className="bg-slate-800 text-white rounded-md px-4 py-2 text-sm disabled:opacity-50">
+          <div className="grid grid-cols-3 gap-2 sm:flex">
+            {CATEGORIES.map((cat) => (
+              <label key={cat} className="text-sm text-slate-600 flex items-center gap-1.5">
+                <span className="font-display font-semibold">{cat}</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={newMax[cat]}
+                  onChange={(e) => setNewMax((m) => ({ ...m, [cat]: e.target.value }))}
+                  aria-label={`คะแนนเต็ม ${cat}`}
+                  className="w-full min-w-0 border border-slate-300 rounded-md px-2 py-2.5 text-base text-center bg-white sm:w-16 sm:py-2 sm:text-sm"
+                />
+              </label>
+            ))}
+          </div>
+          <button disabled={adding} className={PRIMARY}>
             {adding ? "กำลังเพิ่ม..." : "เพิ่มหน่วย"}
           </button>
         </div>
@@ -271,54 +284,66 @@ export default function UnitsPanel({
 
       <div className="space-y-3">
         {sortedUnits.map((u, i) => (
-          <div key={u.id} className="bg-white border border-slate-200 rounded-lg p-4">
+          <div key={u.id} className="bg-white border border-slate-200 rounded-lg p-4" style={{ borderTop: `3px solid ${unitTrace(i)}` }}>
             {renaming?.id === u.id ? (
-              <form onSubmit={saveRename} className="flex gap-2 flex-wrap mb-2">
+              <form onSubmit={saveRename} className="flex flex-col gap-2 mb-3 sm:flex-row sm:flex-wrap">
                 <input
                   value={renaming.title}
                   onChange={(e) => setRenaming({ ...renaming, title: e.target.value })}
                   aria-label="ชื่อหน่วย"
-                  className="flex-1 min-w-[200px] border border-slate-300 rounded-md px-3 py-1.5 text-sm"
+                  className={`${TEXT_INPUT} sm:flex-1 sm:min-w-[200px]`}
                   autoFocus
                   required
                 />
-                <button disabled={unitBusy} className="bg-slate-800 text-white rounded-md px-3 py-1.5 text-sm disabled:opacity-50">
-                  บันทึก
-                </button>
-                <button type="button" onClick={() => setRenaming(null)} className="text-sm text-slate-500 hover:underline">
-                  ยกเลิก
-                </button>
+                <div className="flex gap-2">
+                  <button disabled={unitBusy} className={`${PRIMARY} flex-1 sm:flex-none`}>
+                    บันทึก
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRenaming(null)}
+                    className="min-h-11 flex-1 rounded-md border border-slate-300 px-3 text-sm text-slate-600 sm:min-h-0 sm:flex-none sm:border-0 sm:hover:underline"
+                  >
+                    ยกเลิก
+                  </button>
+                </div>
               </form>
             ) : (
-              <div className="flex items-start justify-between gap-3 mb-2">
-                <p className="font-medium text-slate-700 text-sm">{u.title}</p>
-                <div className="flex gap-3 shrink-0 text-sm">
-                  <button
-                    onClick={() => moveUnit(i, -1)}
-                    disabled={unitBusy || i === 0}
-                    aria-label={`เลื่อน ${u.title} ขึ้น`}
-                    className="text-slate-500 hover:text-slate-800 disabled:opacity-30"
-                  >
-                    ↑
+              // มือถือ: ชื่อหน่วยอยู่บน ปุ่มจัดการเรียงแถวล่าง · จอกว้าง: ปุ่มชิดขวาแถวเดียวกัน
+              <div className="flex flex-col gap-2 mb-3 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                <p className="flex items-center gap-2 font-display font-semibold text-slate-800">
+                  <span className="shrink-0" style={{ color: unitTrace(i) }}>
+                    <UnitGlyph title={u.title} className="size-5" />
+                  </span>
+                  <span className="min-w-0 break-words">{u.title}</span>
+                </p>
+                <div className="flex gap-2 shrink-0 text-sm sm:gap-3">
+                  <button onClick={() => moveUnit(i, -1)} disabled={unitBusy || i === 0} aria-label={`เลื่อน ${u.title} ขึ้น`} className={UNIT_ACTION}>
+                    <Chevron up />
                   </button>
                   <button
                     onClick={() => moveUnit(i, 1)}
                     disabled={unitBusy || i === sortedUnits.length - 1}
                     aria-label={`เลื่อน ${u.title} ลง`}
-                    className="text-slate-500 hover:text-slate-800 disabled:opacity-30"
+                    className={UNIT_ACTION}
                   >
-                    ↓
+                    <Chevron />
                   </button>
-                  <button onClick={() => setRenaming({ id: u.id, title: u.title })} className="text-slate-500 hover:text-slate-800 hover:underline">
+                  <button onClick={() => setRenaming({ id: u.id, title: u.title })} className={`${UNIT_ACTION} sm:hover:underline`}>
                     แก้ชื่อ
                   </button>
-                  <button onClick={() => deleteUnit(u)} disabled={unitBusy} className="text-red-600 hover:text-red-800 hover:underline">
+                  {/* มือถือ: แยกไปชิดขวาสุด ห่างจากปุ่มอื่น กันกดพลาด */}
+                  <button
+                    onClick={() => deleteUnit(u)}
+                    disabled={unitBusy}
+                    className={`${UNIT_ACTION} ml-auto text-red-600 hover:text-red-800 sm:ml-0 sm:hover:underline`}
+                  >
                     ลบ
                   </button>
                 </div>
               </div>
             )}
-            <div className="flex gap-4 flex-wrap">
+            <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:gap-4">
               {CATEGORIES.map((cat) => (
                 <MaxInput
                   key={cat}
@@ -333,9 +358,9 @@ export default function UnitsPanel({
         {units.length === 0 && <p className="text-sm text-slate-400">ยังไม่มีหน่วยการเรียนรู้</p>}
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-lg p-4">
-        <p className="font-medium text-slate-700 text-sm mb-2">คะแนนสอบ</p>
-        <div className="flex gap-4 flex-wrap">
+      <div className="bg-white border border-slate-200 rounded-lg p-4" style={{ borderTop: `3px solid ${EXAM_TRACE}` }}>
+        <p className="font-display font-semibold text-slate-800 mb-3">คะแนนสอบ</p>
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-4">
           {(["midterm", "final"] as const).map((t) => (
             <MaxInput
               key={t}
@@ -419,15 +444,17 @@ function MaxInput({
 
   return (
     <div className="space-y-1">
-      <label className="text-sm text-slate-600 flex items-center gap-1">
-        {label}
+      <label className="text-sm text-slate-600 flex items-center gap-1.5">
+        <span className={wide ? "whitespace-nowrap" : "font-display font-semibold"}>{label}</span>
         <input
           ref={ref}
           // key ผูกกับค่าในฐานข้อมูล ให้ช่องรีเซ็ตเป็นค่าจริงทุกครั้งที่โหลดใหม่
           key={String(value)}
-          type="number"
-          min="0"
-          step="any"
+          // text + แป้นตัวเลข แทน type="number" — ช่อง number เปลี่ยนค่าเองเวลาหมุนลูกกลิ้งเมาส์ผ่าน
+          type="text"
+          inputMode="decimal"
+          enterKeyHint="done"
+          aria-label={`คะแนนเต็ม ${label}`}
           defaultValue={value ?? ""}
           placeholder="—"
           disabled={status === "saving"}
@@ -435,10 +462,18 @@ function MaxInput({
           onKeyDown={(e) => {
             if (e.key === "Enter") e.currentTarget.blur();
           }}
-          className={`${wide ? "w-20" : "w-16"} border rounded-md px-2 py-1 text-sm ${border}`}
+          className={`w-full min-w-0 border rounded-md px-2 py-2.5 text-base text-center sm:py-1 sm:text-sm ${wide ? "sm:w-20" : "sm:w-16"} ${border}`}
         />
       </label>
       {error && <p className="text-xs text-red-600 max-w-[16rem]">{error}</p>}
     </div>
+  );
+}
+
+function Chevron({ up }: { up?: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" className={`size-4 ${up ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="m6 9 6 6 6-6" />
+    </svg>
   );
 }
