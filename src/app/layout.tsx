@@ -3,6 +3,7 @@ import { Anuphan, Barlow_Semi_Condensed, Chakra_Petch } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import PressFx from "@/components/PressFx";
+import AppSplash from "@/components/AppSplash";
 
 const anuphan = Anuphan({
   subsets: ["thai", "latin"],
@@ -38,7 +39,8 @@ export const viewport: Viewport = {
 };
 
 // ตั้งธีมก่อนหน้าแสดงผล กันหน้ากระพริบจากมืดเป็นสว่าง — ค่าเริ่มต้นคือธีมมืด
-const THEME_SCRIPT = `try{if(localStorage.getItem("theme")==="light")document.documentElement.dataset.theme="light"}catch(e){}`;
+// และจำว่าเปิดแอปแล้ว — หน้าเปิดแอปแบบอะตอมแสดงครั้งเดียวต่อการเปิด ไม่ขึ้นซ้ำตอนรีเฟรช
+const THEME_SCRIPT = `try{if(localStorage.getItem("theme")==="light")document.documentElement.dataset.theme="light"}catch(e){}try{if(sessionStorage.getItem("splashed"))document.documentElement.dataset.splashed="1"}catch(e){}`;
 
 export default function RootLayout({
   children,
@@ -50,6 +52,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col font-sans">
         {/* beforeInteractive = ฝังใน HTML แรกจากเซิร์ฟเวอร์ ทำงานก่อนโค้ดของ Next */}
         <Script id="theme" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        <AppSplash />
         <PressFx />
         {children}
       </body>

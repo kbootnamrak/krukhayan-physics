@@ -435,3 +435,58 @@ html {
     transform: scaleX(1);
   }
 }
+
+/*
+ * หน้าเปิดแอป (AppSplash.tsx) — แสดงเฉพาะตอนเปิดจากไอคอนบนหน้าจอหลัก
+ * พื้นสีเดียวกับ background_color ใน manifest ต่อจากหน้าเปิดของระบบได้เนียน
+ * สำรอง: ถ้า JavaScript ไม่ทำงาน จางหายเองหลัง 4 วินาที
+ */
+@keyframes app-splash-out {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+.app-splash {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  place-items: center;
+  background: #0b1330;
+  animation: app-splash-out 400ms ease-out 4s forwards;
+}
+
+@media (display-mode: standalone) {
+  .app-splash {
+    display: grid;
+  }
+}
+
+:root[data-splashed] .app-splash {
+  display: none;
+}
+
+.app-splash.is-leaving {
+  animation: app-splash-out 420ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.app-splash-atom {
+  width: min(58vw, 15rem);
+  height: auto;
+  transition: transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.app-splash.is-leaving .app-splash-atom {
+  transform: scale(1.12);
+}
+
+.app-splash-name {
+  position: absolute;
+  bottom: max(2.5rem, calc(env(safe-area-inset-bottom) + 1.5rem));
+  font-family: var(--font-chakra), sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #cfd8f5;
+}
