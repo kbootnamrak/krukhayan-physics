@@ -9,7 +9,10 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "KruKhayan Physics — ห้องเรียนฟิสิกส์ของครูขยัน",
     short_name: "ครูขยัน ฟิสิกส์",
     description: "คะแนน สื่อการสอน แบบทดสอบ และข้อมูลจากเครื่องวัดจริง",
-    start_url: "/dashboard",
+    // id คงค่าเดิม (เดิมคิดจาก start_url "/dashboard") — แอปที่ติดตั้งไว้แล้วจะอัปเดตเป็นตัวเดิม ไม่กลายเป็นแอปใหม่
+    id: "/dashboard",
+    // เปิดที่หน้าเปิดแอป (static) ให้อะตอมขยับได้ทันที แล้วค่อยไปหน้าหลัก — ดู src/app/launch
+    start_url: "/launch",
     display: "standalone",
     background_color: "#0b1330",
     theme_color: "#0b1330",

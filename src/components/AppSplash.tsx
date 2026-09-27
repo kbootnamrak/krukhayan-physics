@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 // วงโคจรเดียวกับไอคอนแอป (public/icon.svg): วงรี rx 172 ry 66 รอบจุด 256,256 หมุน 0° / 60° / -60°
@@ -23,21 +24,28 @@ const MIN_MS = 1100;
  * - เปิดแท็บในเบราว์เซอร์ปกติไม่แสดง (CSS ซ่อนไว้)
  * - แสดงครั้งเดียวต่อการเปิดแอป (ตั้ง data-splashed ที่ <html> ก่อนหน้าแสดงผล — ดูสคริปต์ธีมใน layout)
  * - ถ้า JavaScript ไม่ทำงาน CSS จางหน้านี้ออกเองใน 4 วินาที ไม่บังหน้าเว็บค้าง
+ * - เปิดแอปที่ /launch (หน้า static ส่งทันที) หน้านี้ค้างไว้จนหน้าหลักขึ้นแล้วจึงจางออก
  */
 export default function AppSplash() {
   const [phase, setPhase] = useState<"show" | "leaving" | "gone">("show");
   const svg = useRef<SVGSVGElement>(null);
+  // เวลาที่หน้านี้ขึ้นครั้งแรก — นับเวลาขั้นต่ำจากตรงนี้ ไม่นับใหม่ตอนเปลี่ยนหน้า
+  const shownAt = useRef(0);
+  const pathname = usePathname();
+  // เริ่มที่หน้าเปิดแอปหรือไม่ — จำค่าแรกไว้ ระหว่างทางไปหน้าหลัก pathname จะเปลี่ยน
+  const [launch] = useState(pathname === "/launch");
+  const onLaunch = pathname === "/launch";
 
   useEffect(() => {
     const standalone = window.matchMedia("(display-mode: standalone)").matches;
-    if (!standalone || document.documentElement.dataset.splashed) {
+    if ((!standalone && !launch) || document.documentElement.dataset.splashed) {
       const t = setTimeout(() => setPhase("gone"), 0);
       return () => clearTimeout(t);
     }
     // ผู้ที่ตั้งลดการเคลื่อนไหว: อะตอมนิ่ง (SMIL ไม่ฟัง CSS prefers-reduced-motion ต้องหยุดเอง)
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) svg.current?.pauseAnimations();
 
-    const started = performance.now();
+    if (!shownAt.current) shownAt.current = performance.now();
     let leave: ReturnType<typeof setTimeout>;
     let gone: ReturnType<typeof setTimeout>;
     const finish = () => {
@@ -47,8 +55,10 @@ export default function AppSplash() {
           sessionStorage.setItem("splashed", "1");
         } catch {}
         gone = setTimeout(() => setPhase("gone"), 450);
-      }, Math.max(0, MIN_MS - (performance.now() - started)));
+      }, Math.max(0, MIN_MS - (performance.now() - shownAt.current)));
     };
+    // เปิดที่ /launch: รอจนเปลี่ยนไปหน้าหลักแล้ว (effect นี้ทำงานใหม่เมื่อ onLaunch เปลี่ยน)
+    if (onLaunch) return;
     if (document.readyState === "complete") finish();
     else window.addEventListener("load", finish, { once: true });
     return () => {
@@ -56,12 +66,12 @@ export default function AppSplash() {
       clearTimeout(leave);
       clearTimeout(gone);
     };
-  }, []);
+  }, [launch, onLaunch]);
 
   if (phase === "gone") return null;
 
   return (
-    <div aria-hidden className={`app-splash ${phase === "leaving" ? "is-leaving" : ""}`}>
+    <div aria-hidden className={`app-splash ${launch ? "is-launch" : ""} ${phase === "leaving" ? "is-leaving" : ""}`}>
       <svg ref={svg} viewBox="0 0 512 512" className="app-splash-atom">
         <defs>
           <filter id="splash-glow" x="-30%" y="-30%" width="160%" height="160%">

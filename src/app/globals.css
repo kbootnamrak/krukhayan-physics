@@ -464,6 +464,12 @@ html {
   }
 }
 
+/* เปิดแอปที่ /launch: แสดงเสมอ (หน้านั้นว่าง มีไว้เปิดอะตอมอย่างเดียว) และรอหน้าหลักได้นานกว่า */
+.app-splash.is-launch {
+  display: grid;
+  animation: app-splash-out 400ms ease-out 10s forwards;
+}
+
 :root[data-splashed] .app-splash {
   display: none;
 }
