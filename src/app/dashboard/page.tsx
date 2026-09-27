@@ -48,7 +48,8 @@ export default async function DashboardPage() {
             <Link
               key={l.href}
               href={l.href}
-              className="group flex items-center gap-3 rounded-sm border-2 border-slate-200 bg-white px-4 py-3.5 hover:border-slate-400"
+              className="neon-card group flex items-center gap-3 rounded-sm border-2 border-slate-200 bg-white px-4 py-3.5"
+              style={{ "--neon": l.color } as React.CSSProperties}
             >
               <span
                 aria-hidden
