@@ -159,7 +159,7 @@ export default function QuizPage({ params }: { params: Promise<{ quizId: string 
 
         {tab === "questions" && <QuestionsEditor quizId={quizId} questions={questions} keys={keys} locked={attempts.length > 0} onChanged={load} />}
         {tab === "sessions" && <SessionsPanel quizId={quizId} sessions={sessions} enrollments={enrollments} attempts={attempts} ready={questions.length > 0} onChanged={load} />}
-        {tab === "results" && <ResultsPanel quiz={quiz} enrollments={enrollments} attempts={attempts} devices={devices} loadedAt={loadedAt} onChanged={load} />}
+        {tab === "results" && <ResultsPanel quiz={quiz} questions={questions} keys={keys} enrollments={enrollments} attempts={attempts} devices={devices} loadedAt={loadedAt} onChanged={load} />}
       </div>
     </div>
   );
