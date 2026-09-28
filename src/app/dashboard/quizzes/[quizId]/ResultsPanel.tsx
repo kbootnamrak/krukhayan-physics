@@ -24,6 +24,20 @@ function leaveTitle(a: QuizAttempt) {
     .join("\n");
 }
 
+/**
+ * เวลาที่ใช้ทำ (วินาที) นับจากกดเริ่มถึงส่ง — ยังไม่ส่ง = null
+ * ไม่เกินเวลาที่กำหนด: คนที่หมดเวลาแล้วครูกด "ตรวจใหม่" ทีหลัง เวลาส่งจะเป็นตอนที่ครูกด
+ */
+function secondsUsed(a: QuizAttempt | null) {
+  if (!a?.submitted_at) return null;
+  const end = Math.min(new Date(a.submitted_at).getTime(), new Date(a.deadline_at).getTime());
+  return Math.max(0, Math.round((end - new Date(a.started_at).getTime()) / 1000));
+}
+
+function mmss(sec: number) {
+  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+}
+
 export type RosterEnrollment = {
   id: string;
   student_id: string | null;
@@ -108,6 +122,10 @@ export default function ResultsPanel({
   const submitted = rows.filter((r) => r.attempt?.submitted_at);
   const scores = submitted.map((r) => r.attempt!.score ?? 0);
   const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
+  const times = submitted.map((r) => secondsUsed(r.attempt)!).filter((x) => x !== null);
+  const avgTime = times.length ? Math.round(times.reduce((a, b) => a + b, 0) / times.length) : null;
+  // ใช้ไม่ถึงหนึ่งในสี่ของเวลาที่ให้ — ไฮไลต์ไว้ให้ครูสังเกต (อาจเก่งจริง หรือเดาเร็ว ๆ)
+  const fastLimit = quiz.time_limit_minutes * 60 * 0.25;
   const expiredUnsent = attempts.filter((a) => !a.submitted_at && new Date(a.deadline_at).getTime() < now).length;
   const stats = itemStats(questions, keys, submitted.map((r) => r.attempt!));
 
@@ -171,6 +189,7 @@ export default function ResultsPanel({
       "ชื่อ-สกุล",
       `คะแนน (เต็ม ${rows.find((r) => r.attempt)?.attempt?.max_score ?? ""})`,
       "สถานะ",
+      "เวลาที่ใช้ (นาที:วินาที)",
       "ออกจากหน้า (ครั้ง)",
       "เวลาที่ออกไปรวม (วินาที)",
     ];
@@ -181,6 +200,7 @@ export default function ResultsPanel({
       r.full_name,
       r.attempt?.submitted_at ? (r.attempt.score ?? "") : "",
       statusOf(r.attempt).text,
+      secondsUsed(r.attempt) === null ? "" : mmss(secondsUsed(r.attempt)!),
       r.attempt ? r.attempt.leave_count : "",
       r.attempt ? awaySeconds(r.attempt) : "",
     ]);
@@ -337,15 +357,26 @@ export default function ResultsPanel({
             <span className="font-num tnum">{Math.max(...scores)}</span> · ต่ำสุด <span className="font-num tnum">{Math.min(...scores)}</span>
           </>
         )}
+        {avgTime !== null && (
+          <span className="block sm:inline">
+            <span className="hidden sm:inline"> · </span>
+            ใช้เวลาเฉลี่ย <span className="font-num tnum font-semibold text-slate-800">{mmss(avgTime)}</span> นาที (เร็วสุด{" "}
+            <span className="font-num tnum">{mmss(Math.min(...times))}</span> · ช้าสุด <span className="font-num tnum">{mmss(Math.max(...times))}</span>
+            {" "}จากที่ให้ {quiz.time_limit_minutes} นาที)
+          </span>
+        )}
       </p>
 
       <div className="overflow-x-auto bg-white border border-slate-200 rounded-sm">
-        <table className="w-full min-w-[640px] text-sm">
+        <table className="w-full min-w-[720px] text-sm">
           <thead>
             <tr className="text-left text-slate-500 border-b border-slate-200">
               <th className="p-2 font-medium">นักเรียน</th>
               <th className="p-2 font-medium">สถานะ</th>
               <th className="p-2 font-medium">เครื่องที่ใช้ทำ</th>
+              <th className="p-2 font-medium text-right" title="นับจากกดเริ่มทำจนส่ง (นาที:วินาที)">
+                เวลาที่ใช้
+              </th>
               <th className="p-2 font-medium text-right" title="จำนวนครั้งที่ออกจากหน้าข้อสอบระหว่างทำ (สลับแอป/แท็บ/รีเฟรช)">
                 ออกจากหน้า
               </th>
@@ -401,6 +432,18 @@ export default function ResultsPanel({
                       );
                     })()}
                   </td>
+                  {(() => {
+                    const used = secondsUsed(r.attempt);
+                    const fast = used !== null && used < fastLimit;
+                    return (
+                      <td
+                        className={`p-2 text-right font-num tnum whitespace-nowrap ${used === null ? "text-slate-400" : fast ? "font-semibold text-amber-700" : "text-slate-700"}`}
+                        title={fast ? `ใช้ไม่ถึง 1 ใน 4 ของเวลาที่ให้ (${quiz.time_limit_minutes} นาที)` : undefined}
+                      >
+                        {used === null ? "–" : mmss(used)}
+                      </td>
+                    );
+                  })()}
                   <td
                     className={`p-2 text-right font-num tnum ${r.attempt && r.attempt.leave_count > 0 ? "text-amber-700 font-semibold" : "text-slate-400"}`}
                     title={r.attempt?.leave_log?.length ? leaveTitle(r.attempt) : undefined}
@@ -427,7 +470,7 @@ export default function ResultsPanel({
                 </tr>
                 {openRow === r.id && r.attempt && (
                   <tr className="bg-slate-50/60">
-                    <td colSpan={6} className="px-2 pb-3 pt-1">
+                    <td colSpan={7} className="px-2 pb-3 pt-1">
                       <AnswerGrid attempt={r.attempt} questions={questions} answerOf={answerOf} />
                     </td>
                   </tr>
