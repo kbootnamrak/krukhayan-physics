@@ -38,13 +38,17 @@ cp config.example.h config.h
 
 `config.h` ถูก `.gitignore` ไว้แล้ว จะไม่ถูก commit
 
+> เว็บย้ายมาใช้โดเมน `phyzix.app` แล้ว (2026-09-28) — บอร์ดที่ตั้ง `INGEST_URL` เป็นชื่อเดิม
+> `krukhayan-physics.vercel.app` ยังส่งข้อมูลได้ตามปกติ ไม่ต้องแก้ ถ้าจะเปลี่ยนเป็นชื่อใหม่
+> ต้องดึงใบรับรองรากของ `phyzix.app` ใหม่ด้วย (หัวข้อถัดไป)
+
 ## ใส่ใบรับรองรากเพื่อให้ตรวจ TLS ได้
 
 ค่าเริ่มต้น `ROOT_CA_PEM` เว้นว่างไว้ บอร์ดจะเชื่อมต่อแบบไม่ตรวจใบรับรอง
 ใช้ได้ตอนทดสอบ แต่ก่อนติดตั้งใช้งานจริงควรใส่ใบรับรองราก
 
 ```bash
-openssl s_client -showcerts -connect krukhayan-physics.vercel.app:443 </dev/null
+openssl s_client -showcerts -connect phyzix.app:443 </dev/null
 ```
 
 คัดลอกใบสุดท้ายในผลลัพธ์ (ใบที่เป็น root CA) รวมบรรทัด `-----BEGIN CERTIFICATE-----`

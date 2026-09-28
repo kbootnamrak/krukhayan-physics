@@ -8,7 +8,7 @@
 #define WIFI_PASSWORD  "รหัสผ่าน Wi-Fi"
 
 // ---------- เซิร์ฟเวอร์ ----------
-#define INGEST_URL     "https://krukhayan-physics.vercel.app/api/iot/ingest"
+#define INGEST_URL     "https://phyzix.app/api/iot/ingest"
 
 // device key ที่ได้ตอนกดเพิ่มอุปกรณ์ในหน้าเว็บ (แสดงครั้งเดียว)
 #define DEVICE_KEY     "kkp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
@@ -26,7 +26,7 @@
 
 // ---------- TLS ----------
 // ใบรับรองรากของเซิร์ฟเวอร์ ดึงมาด้วยคำสั่ง (ดู README):
-//   openssl s_client -showcerts -connect krukhayan-physics.vercel.app:443 </dev/null
+//   openssl s_client -showcerts -connect phyzix.app:443 </dev/null
 // วางใบสุดท้าย (root CA) ลงตรงนี้ ถ้าเว้นว่างไว้ บอร์ดจะเชื่อมต่อแบบไม่ตรวจใบรับรอง
 // ซึ่งเสี่ยงต่อการถูกดักกลางทาง — ใช้ได้เฉพาะตอนทดสอบเท่านั้น
 #define ROOT_CA_PEM ""

@@ -82,7 +82,7 @@ SQL ทั้งหมดอยู่ใน `supabase/migrations/` เรีย�
 
 ## เว็บไซต์ที่ deploy แล้ว
 
-https://krukhayan-physics.vercel.app
+https://phyzix.app
 
 ## Supabase Project
 
