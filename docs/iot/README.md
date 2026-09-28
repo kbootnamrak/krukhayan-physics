@@ -509,7 +509,7 @@ select cron.schedule('iot-purge', '0 3 * * *', $$select public.iot_purge_old_rea
 
 ```bash
 # ส่งค่าปกติ
-curl -X POST https://krukhayan-physics.vercel.app/api/iot/ingest \
+curl -X POST https://phyzix.app/api/iot/ingest \
   -H "Content-Type: application/json" \
   -H "x-device-key: kkp_xxxxxxxxxxxx" \
   -d '{"temperature_c": 26.5, "humidity_pct": 55}'
@@ -519,7 +519,7 @@ curl ... -d '{"temperature_c": 35.0, "humidity_pct": 55}'
 curl ... -d '{"temperature_c": 35.2, "humidity_pct": 55}'   # ครั้งนี้ควรได้ LINE
 
 # ตรวจอุปกรณ์ออฟไลน์
-curl https://krukhayan-physics.vercel.app/api/iot/cron/offline-check \
+curl https://phyzix.app/api/iot/cron/offline-check \
   -H "Authorization: Bearer <CRON_SECRET>"
 ```
 
