@@ -123,7 +123,10 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
           </p>
         )}
 
-        <ThemePicker gameId={game.id} value={themeOf(game.theme)} onChanged={load} />
+        <div className="grid gap-4 lg:grid-cols-[auto_minmax(0,1fr)]">
+          <ModePicker gameId={game.id} value={game.mode === "battle" ? "battle" : "runner"} onChanged={load} />
+          <ThemePicker gameId={game.id} value={themeOf(game.theme)} onChanged={load} />
+        </div>
 
         <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-slate-200" style={{ "--neon": "var(--trace-magenta)" } as React.CSSProperties}>
           {tabs.map((t) => (
@@ -546,6 +549,57 @@ function ThemePicker({ gameId, value, onChanged }: { gameId: string; value: Them
                 </span>
                 <span className="block text-[11px] leading-tight text-slate-500">{t.line}</span>
               </span>
+            </button>
+          );
+        })}
+      </div>
+      {error && <p className="text-sm text-red-700">{error}</p>}
+    </fieldset>
+  );
+}
+
+// ---------------------------------------------------------------------------
+const MODES: { id: "runner" | "battle"; name: string; line: string }[] = [
+  { id: "runner", name: "วิ่งข้ามด่าน", line: "มุมมองด้านข้าง วิ่งเจอศัตรูทีละตัว" },
+  { id: "battle", name: "บอสแบทเทิล", line: "ด่านละบอส ผลัดกันโจมตี มีหลอด HP" },
+];
+
+/** รูปแบบการเล่นของเกม — เปลี่ยนได้ตลอด คะแนนและคำตอบไม่หาย (ตรวจที่เซิร์ฟเวอร์แบบเดียวกัน) */
+function ModePicker({ gameId, value, onChanged }: { gameId: string; value: "runner" | "battle"; onChanged: () => void }) {
+  const supabase = createClient();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function choose(id: "runner" | "battle") {
+    if (id === value) return;
+    setBusy(true);
+    const { error: e } = await supabase.from("games").update({ mode: id }).eq("id", gameId);
+    setBusy(false);
+    if (e) return setError(dbErrorMessage(e));
+    setError(null);
+    onChanged();
+  }
+
+  return (
+    <fieldset className="space-y-2">
+      <legend className="font-display font-semibold text-slate-800">รูปแบบการเล่น</legend>
+      <div role="radiogroup" className="grid grid-cols-2 gap-2 lg:grid-cols-1">
+        {MODES.map((m) => {
+          const on = m.id === value;
+          return (
+            <button
+              key={m.id}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              disabled={busy}
+              onClick={() => choose(m.id)}
+              className={`min-h-11 rounded-sm border-2 px-3 py-2 text-left transition-colors disabled:opacity-60 ${
+                on ? "border-trace-cyan bg-[color-mix(in_oklch,var(--trace-cyan)_10%,transparent)]" : "border-slate-200 hover:border-slate-400"
+              }`}
+            >
+              <span className="block font-display text-sm font-semibold text-slate-800">{m.name}</span>
+              <span className="block text-[11px] leading-tight text-slate-500">{m.line}</span>
             </button>
           );
         })}

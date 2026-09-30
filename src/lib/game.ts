@@ -11,6 +11,8 @@ export type GameStage = {
   scene?: string;
   /** ภาพฉากและศัตรูแบบที่ 1–4: แล็บเทสลา · เสาสัญญาณ · เส้นสนาม · ปริซึม (ไม่ใส่ = ตามลำดับด่าน) */
   art?: number;
+  /** ชื่อบอสของด่าน (โหมดบอสแบทเทิล) ไม่ใส่ = ชื่อตามธีม */
+  boss?: string;
 };
 
 export type Game = {
@@ -23,6 +25,8 @@ export type Game = {
   seconds_per_item: number;
   /** ธีมของฉากในเกม: cyber (เมืองนีออน) · ocean (ใต้สมุทร) · space (อวกาศ) */
   theme: string;
+  /** รูปแบบการเล่น: runner (วิ่งข้ามด่าน) · battle (บอสแบทเทิล) */
+  mode: string;
   created_at: string;
 };
 
@@ -54,6 +58,7 @@ export type GamePayload = {
   title: string;
   description: string | null;
   theme?: string;
+  mode?: string;
   stages: GameStage[];
   seconds_per_item: number;
   finished: boolean;

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { gameErrorMessage, type GamePayload, type GameStage } from "@/lib/game";
 import { BackLink, Intro, Results } from "./GamePlayer";
 import { Adventure, CharacterPicker, loadCharacter } from "./Adventure";
+import { Battle } from "./Battle";
 import { CharacterSprite, type CharacterId } from "./sprites";
 
 type Phase =
@@ -83,11 +84,12 @@ export default function PlayGamePage({ params }: { params: Promise<{ gameId: str
           </Intro>
         )}
 
-        {phase.kind === "playing" && (
-          <Adventure
-            data={phase.data}
-            onFinished={(data) => setPhase({ kind: "done", data, courseId: phase.courseId })}
-          />
+        {/* รูปแบบการเล่นตามที่ครูตั้งไว้ในเกม: บอสแบทเทิล หรือวิ่งข้ามด่าน */}
+        {phase.kind === "playing" && phase.data.mode === "battle" && (
+          <Battle data={phase.data} onFinished={(data) => setPhase({ kind: "done", data, courseId: phase.courseId })} />
+        )}
+        {phase.kind === "playing" && phase.data.mode !== "battle" && (
+          <Adventure data={phase.data} onFinished={(data) => setPhase({ kind: "done", data, courseId: phase.courseId })} />
         )}
 
         {phase.kind === "done" && (

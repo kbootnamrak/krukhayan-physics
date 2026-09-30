@@ -66,15 +66,15 @@ export function CharacterPicker({ value, onChange }: { value: CharacterId; onCha
 // ---------------------------------------------------------------------------
 // เกมผจญภัย: ตัวละครวิ่งไปทางขวา เจอศัตรู 1 ตัวต่อ 1 ข้อ
 // ---------------------------------------------------------------------------
-type Local = { xp: number; streak: number; best: number };
-function loadLocal(playId: string): Local {
+export type Local = { xp: number; streak: number; best: number };
+export function loadLocal(playId: string): Local {
   try {
     const raw = localStorage.getItem(`game:${playId}`);
     if (raw) return { xp: 0, streak: 0, best: 0, ...JSON.parse(raw) };
   } catch {}
   return { xp: 0, streak: 0, best: 0 };
 }
-function saveLocal(playId: string, v: Local) {
+export function saveLocal(playId: string, v: Local) {
   try {
     localStorage.setItem(`game:${playId}`, JSON.stringify(v));
   } catch {}
