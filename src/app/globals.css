@@ -876,3 +876,109 @@ html {
     animation: none;
   }
 }
+
+/* บอสแบทเทิล (play/Battle.tsx): บอสลงสนาม · โดนโจมตี · สวนกลับ · หนีไป · กระสุนพุ่งเฉียง */
+@keyframes battle-boss-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-30%) scale(1.25);
+  }
+}
+.battle-boss-enter {
+  animation: battle-boss-enter 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes battle-boss-hit {
+  0%,
+  100% {
+    transform: none;
+    filter: none;
+  }
+  45% {
+    transform: translateX(8%) rotate(4deg);
+    filter: brightness(2.2) drop-shadow(0 0 10px var(--c-red-500));
+  }
+  70% {
+    transform: translateX(-4%);
+  }
+}
+.battle-boss-hit {
+  animation: battle-boss-hit 600ms ease-out 350ms both;
+}
+@keyframes battle-boss-attack {
+  0%,
+  100% {
+    transform: none;
+  }
+  35% {
+    transform: translate(-18%, 12%) scale(1.08);
+  }
+}
+.battle-boss-attack {
+  animation: battle-boss-attack 600ms cubic-bezier(0.5, 0, 0.3, 1);
+}
+@keyframes battle-boss-flee {
+  to {
+    opacity: 0;
+    transform: translate(60%, -30%) scale(0.6);
+  }
+}
+.battle-boss-flee {
+  animation: battle-boss-flee 900ms ease-in 300ms forwards;
+}
+@keyframes battle-hero-lunge {
+  0%,
+  100% {
+    transform: none;
+  }
+  30% {
+    transform: translate(14%, -8%);
+  }
+}
+.battle-hero-lunge {
+  animation: battle-hero-lunge 450ms cubic-bezier(0.5, 0, 0.3, 1);
+}
+@keyframes battle-shot {
+  0% {
+    transform: translate(0, 0) scale(0.6);
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(min(38vw, 260px), max(-18vh, -150px)) scale(1.4);
+    opacity: 0;
+  }
+}
+.battle-shot {
+  animation: battle-shot 500ms cubic-bezier(0.4, 0, 0.8, 0.6) 120ms both;
+}
+@keyframes battle-shot-back {
+  0% {
+    transform: translate(0, 0) scale(0.6);
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(max(-38vw, -260px), min(18vh, 150px)) scale(1.4);
+    opacity: 0;
+  }
+}
+.battle-shot-back {
+  animation: battle-shot-back 500ms cubic-bezier(0.4, 0, 0.8, 0.6) 150ms both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .battle-boss-enter,
+  .battle-boss-hit,
+  .battle-boss-attack,
+  .battle-hero-lunge,
+  .battle-shot,
+  .battle-shot-back {
+    animation: none;
+  }
+  .battle-boss-flee {
+    animation-duration: 1ms;
+  }
+}
