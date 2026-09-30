@@ -212,6 +212,10 @@ export function Adventure({ data, onFinished }: { data: GamePayload; onFinished:
   }
 
   const stage = item?.stage ?? data.stages.length;
+  const stageInfo = data.stages[stage - 1];
+  // แต่ละเกมกำหนดชื่อฉากและภาพฉากของด่านเองได้ (ไม่กำหนด = ตามลำดับด่าน)
+  const art = stageInfo?.art ?? stage;
+  const sceneName = stageInfo?.scene ?? STAGE_SCENES[(stage - 1) % STAGE_SCENES.length];
   const color = stageColor(stage);
   const isBoss = index === items.length - 1;
   const stageItems = items.filter((x) => x.stage === stage);
@@ -229,7 +233,7 @@ export function Adventure({ data, onFinished }: { data: GamePayload; onFinished:
           <Skyline color={color} />
         </div>
         <div className="adv-layer adv-mid absolute inset-x-0 bottom-[20%] h-[50%] w-[200%]">
-          <StageProps stage={stage} color={color} />
+          <StageProps stage={art} color={color} />
         </div>
         <div className="absolute inset-x-0 bottom-0 h-[20%] border-t-2" style={{ borderColor: color, background: "var(--c-slate-100)" }}>
           <div className="adv-layer adv-ground h-full w-[200%]" style={{ backgroundImage: `repeating-linear-gradient(90deg, transparent 0 38px, color-mix(in oklch, ${color} 45%, transparent) 38px 40px)` }} />
@@ -239,7 +243,7 @@ export function Adventure({ data, onFinished }: { data: GamePayload; onFinished:
         <div className="absolute inset-x-0 top-0 flex items-center gap-2 px-3 py-2">
           <span className="flex">{Array.from({ length: HEARTS }, (_, i) => <Heart key={i} full={i < hearts} />)}</span>
           <span className="min-w-0 flex-1 truncate font-display text-xs font-semibold text-slate-700 sm:text-sm">
-            ด่าน {stage} · {STAGE_SCENES[(stage - 1) % STAGE_SCENES.length]} · {posInStage}/{stageItems.length}
+            ด่าน {stage} · {sceneName} · {posInStage}/{stageItems.length}
           </span>
           {local.streak >= 2 && <span className="rounded-sm border-2 border-trace-yellow px-1.5 font-display text-xs font-bold text-trace-yellow">×{local.streak}</span>}
           <span className="relative font-num tnum text-xs text-slate-600 sm:text-sm">
@@ -272,7 +276,7 @@ export function Adventure({ data, onFinished }: { data: GamePayload; onFinished:
             {isBoss && beat !== "walk" && (
               <span className="absolute -top-5 left-1/2 -translate-x-1/2 rounded-sm bg-[var(--c-red-500)] px-1.5 font-display text-xs font-bold text-[oklch(100%_0_0)]">บอส</span>
             )}
-            <EnemySprite stage={stage} boss={isBoss} className="h-auto w-full" />
+            <EnemySprite stage={art} boss={isBoss} className="h-auto w-full" />
           </div>
         )}
 
@@ -295,7 +299,7 @@ export function Adventure({ data, onFinished }: { data: GamePayload; onFinished:
         {beat === "stage" && item && (
           <div className="stage-enter absolute inset-x-4 top-1/2 mx-auto max-w-sm -translate-y-1/2 space-y-3 rounded-sm border-2 bg-[color-mix(in_oklch,var(--c-white)_92%,transparent)] p-4 text-center" style={{ borderColor: color }}>
             <h2 className="font-display text-xl font-bold text-slate-800">
-              <span style={{ color }}>ด่าน {stage}</span> · {STAGE_SCENES[(stage - 1) % STAGE_SCENES.length]}
+              <span style={{ color }}>ด่าน {stage}</span> · {sceneName}
             </h2>
             <StageBrief info={data.stages[stage - 1]} count={stageItems.length} />
             <button

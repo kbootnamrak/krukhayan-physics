@@ -4,7 +4,14 @@
  * ดูรายละเอียดความปลอดภัยใน migration ของเกมภารกิจ
  */
 
-export type GameStage = { title: string; intro?: string };
+export type GameStage = {
+  title: string;
+  intro?: string;
+  /** ชื่อฉากในเกมผจญภัย เช่น "หอคอยสัญญาณ" (ไม่ใส่ = ชื่อฉากตามลำดับด่าน) */
+  scene?: string;
+  /** ภาพฉากและศัตรูแบบที่ 1–4: แล็บเทสลา · เสาสัญญาณ · เส้นสนาม · ปริซึม (ไม่ใส่ = ตามลำดับด่าน) */
+  art?: number;
+};
 
 export type Game = {
   id: string;
