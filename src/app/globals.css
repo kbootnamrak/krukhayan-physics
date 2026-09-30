@@ -575,3 +575,269 @@ html {
     animation-duration: 1ms;
   }
 }
+
+/*
+ * เกมผจญภัย (dashboard/games/.../play/Adventure.tsx + sprites.tsx)
+ * ฉากหลัง 3 ชั้นเลื่อนต่างความเร็ว (parallax) เฉพาะตอนตัวละครวิ่ง
+ * ตัวละคร: ขาแกว่ง ตัวกระเด้ง · ศัตรู: เดินเข้ามา โจมตี ระเบิด
+ */
+@keyframes adv-scroll {
+  to {
+    transform: translateX(-50%);
+  }
+}
+.adv-layer {
+  animation: adv-scroll linear infinite;
+  animation-play-state: paused;
+}
+.adv-far {
+  animation-duration: 40s;
+}
+.adv-mid {
+  animation-duration: 14s;
+}
+.adv-ground {
+  animation-duration: 2.4s;
+}
+.is-walking .adv-layer {
+  animation-play-state: running;
+}
+
+.sprite-leg,
+.sprite-arm,
+.sprite-tail {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;
+}
+@keyframes sprite-step {
+  0%,
+  100% {
+    transform: rotate(22deg);
+  }
+  50% {
+    transform: rotate(-22deg);
+  }
+}
+@keyframes sprite-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4%);
+  }
+}
+@keyframes sprite-breathe {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-1.5%);
+  }
+}
+.sprite-walking {
+  animation: sprite-bob 380ms ease-in-out infinite;
+}
+.sprite-walking .sprite-leg-front {
+  animation: sprite-step 380ms ease-in-out infinite;
+}
+.sprite-walking .sprite-leg-back {
+  animation: sprite-step 380ms ease-in-out infinite reverse;
+}
+.sprite-walking .sprite-tail {
+  animation: sprite-step 760ms ease-in-out infinite;
+}
+.sprite-idle {
+  animation: sprite-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes sprite-blink {
+  0%,
+  88%,
+  100% {
+    opacity: 1;
+  }
+  94% {
+    opacity: 0.2;
+  }
+}
+.sprite-blink {
+  animation: sprite-blink 2.2s ease-in-out infinite;
+}
+@keyframes sprite-hover {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+.sprite-hover {
+  animation: sprite-hover 1.6s ease-in-out infinite;
+}
+@keyframes sprite-glitch {
+  0%,
+  86%,
+  100% {
+    transform: translateX(0);
+  }
+  90% {
+    transform: translateX(-3px) skewX(-6deg);
+  }
+  95% {
+    transform: translateX(2px) skewX(4deg);
+  }
+}
+.sprite-glitch {
+  animation: sprite-glitch 1.8s steps(1) infinite;
+}
+@keyframes sprite-field {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+.sprite-field {
+  stroke-dasharray: 6 6;
+  animation: sprite-field 0.9s linear infinite;
+}
+.sprite-spin {
+  animation: sprite-blink 0.25s linear infinite;
+}
+
+@keyframes adv-enemy-enter {
+  from {
+    transform: translateX(160%);
+  }
+}
+.adv-enemy-enter {
+  animation: adv-enemy-enter 1600ms cubic-bezier(0.22, 0.9, 0.3, 1) both;
+}
+@keyframes adv-enemy-down {
+  0%,
+  35% {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+  45% {
+    filter: brightness(2.5);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(20%) scale(0.6) rotate(-18deg);
+    filter: brightness(1.5);
+  }
+}
+.adv-enemy-down {
+  animation: adv-enemy-down 900ms ease-in forwards;
+}
+@keyframes adv-enemy-attack {
+  0%,
+  100% {
+    transform: none;
+  }
+  40% {
+    transform: translateX(-35%);
+  }
+}
+.adv-enemy-attack {
+  animation: adv-enemy-attack 600ms cubic-bezier(0.5, 0, 0.3, 1);
+}
+@keyframes adv-hurt {
+  0%,
+  100% {
+    transform: none;
+    filter: none;
+  }
+  30% {
+    transform: translateX(-10%);
+    filter: drop-shadow(0 0 8px var(--c-red-500)) brightness(1.3);
+  }
+  55% {
+    transform: translateX(6%);
+  }
+  75% {
+    transform: translateX(-3%);
+  }
+}
+.adv-hurt {
+  animation: adv-hurt 700ms ease-out 250ms;
+}
+@keyframes adv-beam {
+  0% {
+    transform: scaleX(0);
+    opacity: 1;
+  }
+  35% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 0;
+  }
+}
+.adv-beam {
+  animation: adv-beam 600ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes adv-burst {
+  0% {
+    transform: rotate(var(--a)) translateX(0) scale(1);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    transform: rotate(var(--a)) translateX(46px) scale(0.3);
+    opacity: 0;
+  }
+}
+.adv-burst > span {
+  opacity: 0;
+  animation: adv-burst 700ms cubic-bezier(0.16, 1, 0.3, 1) 250ms forwards;
+}
+@keyframes adv-zap {
+  0% {
+    transform: scaleX(0);
+    opacity: 1;
+  }
+  45% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 0;
+  }
+}
+.adv-zap {
+  animation: adv-zap 500ms ease-out 150ms both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .adv-layer,
+  .sprite-walking,
+  .sprite-walking .sprite-leg-front,
+  .sprite-walking .sprite-leg-back,
+  .sprite-walking .sprite-tail,
+  .sprite-idle,
+  .sprite-blink,
+  .sprite-hover,
+  .sprite-glitch,
+  .sprite-field,
+  .sprite-spin,
+  .adv-enemy-enter,
+  .adv-enemy-attack,
+  .adv-hurt,
+  .adv-beam,
+  .adv-zap,
+  .adv-burst > span {
+    animation: none;
+  }
+  .adv-enemy-down {
+    animation-duration: 1ms;
+  }
+}

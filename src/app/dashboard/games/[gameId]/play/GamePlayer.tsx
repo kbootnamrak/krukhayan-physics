@@ -1,14 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useEffect, useMemo, useRef, useState } from "react";
 import QuizText from "@/components/QuizText";
 import { unitTrace } from "@/lib/traces";
 import {
   CHOICE_LETTERS,
   formatNumber,
-  gameErrorMessage,
   parseNumber,
   type GameFeedback,
   type GameItem,
@@ -16,7 +14,7 @@ import {
   type GameStage,
 } from "@/lib/game";
 
-/** ส่วนประกอบของเกมภารกิจ: หน้าเริ่ม · ระหว่างเล่น · สรุปผล (หน้า play/page.tsx ต่อข้อมูลเข้าให้) */
+/** ส่วนประกอบของเกมภารกิจ: หน้าเริ่ม · การ์ดโจทย์ · สรุปผล (ฉากผจญภัยอยู่ใน Adventure.tsx) */
 
 export type IntroInfo = { title: string; description: string | null; stages: GameStage[]; courseId: string };
 
@@ -36,7 +34,7 @@ const stageColor = (stage: number) => unitTrace(stage - 1);
 // ---------------------------------------------------------------------------
 // หน้าเริ่มภารกิจ
 // ---------------------------------------------------------------------------
-export function Intro({ phase, onStart }: { phase: IntroInfo; onStart: () => void }) {
+export function Intro({ phase, onStart, children }: { phase: IntroInfo; onStart: () => void; children?: React.ReactNode }) {
   return (
     <div className="space-y-5 rounded-sm border-2 border-porcelain bg-white p-5 sm:p-6">
       <div className="space-y-1">
@@ -68,9 +66,12 @@ export function Intro({ phase, onStart }: { phase: IntroInfo; onStart: () => voi
         ))}
       </ol>
 
+      {children}
+
       <ul className="list-disc space-y-1.5 pl-5 text-sm text-slate-600">
         <li>ตอบแล้วรู้ผลทันที พร้อมคำอธิบาย — <b className="text-slate-800">คะแนนนับเฉพาะคำตอบแรก</b></li>
-        <li>ตอบถูกต่อเนื่องได้คอมโบ ตอบเร็วได้โบนัส XP (XP ไม่ใช่คะแนนเก็บ)</li>
+        <li>วิ่งฝ่าด่าน เจอศัตรูต้องตอบโจทย์ ตอบถูกยิงทำลาย ตอบผิดโดนโจมตีเสียหัวใจ</li>
+        <li>ตอบถูกต่อเนื่องได้คอมโบ ตอบเร็วได้โบนัส XP (หัวใจและ XP ไม่ใช่คะแนนเก็บ)</li>
         <li>ปิดหน้าแล้วกลับมาเล่นต่อจากข้อที่ค้างได้ แต่เล่นซ้ำเพื่อเอาคะแนนใหม่ไม่ได้</li>
       </ul>
 
@@ -89,281 +90,8 @@ export function Intro({ phase, onStart }: { phase: IntroInfo; onStart: () => voi
 }
 
 // ---------------------------------------------------------------------------
-// ระหว่างเล่น
+// การ์ดโจทย์ (ใช้ในเกมผจญภัย Adventure.tsx)
 // ---------------------------------------------------------------------------
-type Local = { xp: number; streak: number; best: number };
-
-function loadLocal(playId: string): Local {
-  try {
-    const raw = localStorage.getItem(`game:${playId}`);
-    if (raw) return { xp: 0, streak: 0, best: 0, ...JSON.parse(raw) };
-  } catch {}
-  return { xp: 0, streak: 0, best: 0 };
-}
-function saveLocal(playId: string, v: Local) {
-  try {
-    localStorage.setItem(`game:${playId}`, JSON.stringify(v));
-  } catch {}
-}
-
-export function Playing({ data, onFinished }: { data: GamePayload; onFinished: (d: GamePayload) => void }) {
-  const supabase = createClient();
-  const items = data.items;
-  const [feedback, setFeedback] = useState<Record<string, GameFeedback>>(data.feedback ?? {});
-  const [score, setScore] = useState(Number(data.score));
-  const [local, setLocal] = useState<Local>({ xp: 0, streak: 0, best: 0 });
-  const [index, setIndex] = useState(() => {
-    const i = items.findIndex((it) => !(data.feedback ?? {})[it.id]);
-    return i === -1 ? items.length : i;
-  });
-  const [shownStage, setShownStage] = useState<number | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [gain, setGain] = useState<{ xp: number; key: number } | null>(null);
-  const finishing = useRef(false);
-
-  // XP ระหว่างเล่นเก็บในเครื่อง — กลับมาเล่นต่อแล้วยังอยู่
-  useEffect(() => {
-    const t = setTimeout(() => setLocal(loadLocal(data.play_id)), 0);
-    return () => clearTimeout(t);
-  }, [data.play_id]);
-
-  const item = items[index] as GameItem | undefined;
-  const fb = item ? feedback[item.id] : undefined;
-  const stages = data.stages;
-
-  // เข้าด่านใหม่ → ขึ้นป้ายด่านก่อน
-  const needStageCard = !!item && !fb && shownStage !== item.stage && (index === 0 || items[index - 1]?.stage !== item.stage);
-
-  const finish = useCallback(async () => {
-    if (finishing.current) return;
-    finishing.current = true;
-    setBusy(true);
-    const { data: res, error: e } = await supabase.rpc("game_finish", { p_play: data.play_id, p_xp: Math.round(local.xp) });
-    setBusy(false);
-    if (e) {
-      finishing.current = false;
-      return setError(gameErrorMessage(e.message));
-    }
-    onFinished(res as GamePayload);
-  }, [data.play_id, local.xp, onFinished, supabase]);
-
-  // ครบทุกข้อแล้ว (เช่นกลับมาหลังตอบข้อสุดท้ายแต่ยังไม่ได้กดจบ)
-  useEffect(() => {
-    if (index >= items.length && !finishing.current) {
-      const t = setTimeout(finish, 0);
-      return () => clearTimeout(t);
-    }
-  }, [finish, index, items.length]);
-
-  // นาฬิกาโบนัสของข้อนี้
-  const [left, setLeft] = useState(data.seconds_per_item);
-  const startedAt = useRef<number>(0);
-  useEffect(() => {
-    if (!item || fb || needStageCard) return;
-    startedAt.current = performance.now();
-    const reset = setTimeout(() => setLeft(data.seconds_per_item), 0);
-    const id = setInterval(() => {
-      const s = data.seconds_per_item - (performance.now() - startedAt.current) / 1000;
-      setLeft(Math.max(0, s));
-    }, 250);
-    return () => {
-      clearTimeout(reset);
-      clearInterval(id);
-    };
-  }, [item, fb, needStageCard, data.seconds_per_item]);
-
-  async function submit(choice: number | null, value: number | null) {
-    if (!item || busy) return;
-    const remaining = Math.max(0, data.seconds_per_item - (performance.now() - startedAt.current) / 1000);
-    setBusy(true);
-    setError(null);
-    const { data: res, error: e } = await supabase.rpc("game_answer", {
-      p_play: data.play_id,
-      p_item: item.id,
-      p_choice: choice,
-      p_value: value,
-    });
-    setBusy(false);
-    if (e) return setError(gameErrorMessage(e.message));
-    const f = res as GameFeedback;
-    setFeedback((prev) => ({ ...prev, [item.id]: f }));
-    setScore((s) => s + Number(f.pts));
-    // XP: 100 ต่อคะแนน × คอมโบ + โบนัสเวลาที่เหลือ
-    const streak = f.ok ? local.streak + 1 : 0;
-    const combo = f.ok ? Math.min(2, 1 + (streak - 1) * 0.25) : 1;
-    const xpGain = f.ok ? Math.round(100 * Number(item.points) * combo + remaining * 2) : 0;
-    const next = { xp: local.xp + xpGain, streak, best: Math.max(local.best, streak) };
-    setLocal(next);
-    saveLocal(data.play_id, next);
-    if (xpGain) setGain({ xp: xpGain, key: Date.now() });
-  }
-
-  const answeredCount = Object.keys(feedback).length;
-
-  return (
-    <div className="space-y-4">
-      <Hud
-        title={data.title}
-        stages={stages}
-        items={items}
-        feedback={feedback}
-        currentStage={item?.stage ?? stages.length}
-        score={score}
-        maxScore={Number(data.max_score)}
-        xp={local.xp}
-        streak={local.streak}
-        gain={gain}
-      />
-
-      {error && (
-        <p role="alert" className="rounded-sm border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
-          {error}
-        </p>
-      )}
-
-      {item && needStageCard && (
-        <StageCard
-          stage={item.stage}
-          info={stages[item.stage - 1]}
-          count={items.filter((x) => x.stage === item.stage).length}
-          onGo={() => setShownStage(item.stage)}
-        />
-      )}
-
-      {item && !needStageCard && (
-        <QuestionCard
-          key={item.id}
-          item={item}
-          number={index + 1}
-          total={items.length}
-          feedback={fb}
-          busy={busy}
-          timeLeft={left}
-          timeTotal={data.seconds_per_item}
-          onSubmit={submit}
-          onNext={() => setIndex((i) => i + 1)}
-          isLast={index === items.length - 1}
-        />
-      )}
-
-      {!item && (
-        <p className="text-sm text-slate-500" aria-live="polite">
-          {busy ? "กำลังสรุปผล..." : `ตอบครบ ${answeredCount} ข้อแล้ว`}
-        </p>
-      )}
-    </div>
-  );
-}
-
-/** แถบสถานะด้านบน: ด่านเป็นจุดบนเส้นวงจร · คะแนน · XP · คอมโบ */
-function Hud({
-  title,
-  stages,
-  items,
-  feedback,
-  currentStage,
-  score,
-  maxScore,
-  xp,
-  streak,
-  gain,
-}: {
-  title: string;
-  stages: GameStage[];
-  items: GameItem[];
-  feedback: Record<string, GameFeedback>;
-  currentStage: number;
-  score: number;
-  maxScore: number;
-  xp: number;
-  streak: number;
-  gain: { xp: number; key: number } | null;
-}) {
-  return (
-    <div className="sticky top-0 z-20 -mx-4 space-y-2.5 border-b-2 border-slate-200 bg-slate-50 px-4 py-3 sm:mx-0 sm:rounded-sm sm:border-2">
-      <div className="flex items-center gap-3">
-        <h1 className="min-w-0 flex-1 truncate font-display font-semibold text-slate-800">{title}</h1>
-        {streak >= 2 && (
-          <span className="rounded-sm border-2 border-trace-yellow px-2 py-0.5 font-display text-xs font-bold text-trace-yellow route-glow" aria-label={`ตอบถูกติดกัน ${streak} ข้อ`}>
-            คอมโบ ×{streak}
-          </span>
-        )}
-        <span className="relative font-num tnum text-sm text-slate-600">
-          <span className="font-semibold text-trace-cyan">{Math.round(xp).toLocaleString()}</span> XP
-          {gain && (
-            <span key={gain.key} aria-hidden className="xp-pop absolute -top-4 right-0 font-display text-sm font-bold text-trace-lime">
-              +{gain.xp}
-            </span>
-          )}
-        </span>
-        <span className="font-num tnum text-lg font-bold text-slate-800" aria-label={`คะแนน ${score} จาก ${maxScore}`}>
-          {score}
-          <span className="text-sm font-normal text-slate-500">/{maxScore}</span>
-        </span>
-      </div>
-
-      {/* ด่าน: แต่ละด่านเป็นเส้นทองแดง จุดบัดกรีต่อข้อ ทึบ = ตอบแล้ว (เขียว/แดง) */}
-      <div className="flex items-center gap-1.5" aria-label="ความคืบหน้า">
-        {stages.map((_, si) => {
-          const stage = si + 1;
-          const its = items.filter((x) => x.stage === stage);
-          const color = stageColor(stage);
-          const active = stage === currentStage;
-          return (
-            <div key={si} className="flex min-w-0 flex-1 items-center gap-1" style={{ flexGrow: Math.max(1, its.length) }}>
-              <span
-                className={`relative flex h-2.5 flex-1 items-center justify-around rounded-full ${active ? "route-glow" : ""}`}
-                style={{ background: `color-mix(in oklch, ${color} ${active ? 45 : 22}%, transparent)`, color }}
-              >
-                {its.map((it) => {
-                  const f = feedback[it.id];
-                  return (
-                    <span
-                      key={it.id}
-                      className={`size-1.5 rounded-full ${f ? (f.ok ? "bg-green-500" : "bg-red-500") : "bg-[var(--c-slate-50)]"}`}
-                    />
-                  );
-                })}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function StageCard({ stage, info, count, onGo }: { stage: number; info: GameStage | undefined; count: number; onGo: () => void }) {
-  const color = stageColor(stage);
-  return (
-    <section
-      className="stage-enter space-y-4 rounded-sm border-2 bg-white p-6 text-center"
-      style={{ borderColor: color, boxShadow: `0 6px 28px -10px color-mix(in oklch, ${color} calc(var(--glow-strength) * 120%), transparent)` }}
-    >
-      <h2 className="font-display text-2xl font-bold text-slate-800">
-        <span style={{ color }}>ด่าน {stage}</span>
-        {info?.title && <span className="block">{info.title}</span>}
-      </h2>
-      {info?.intro && (
-        <p className="text-slate-600">
-          <QuizText text={info.intro} />
-        </p>
-      )}
-      <p className="text-sm text-slate-500">{count} ข้อ</p>
-      <button
-        type="button"
-        onClick={onGo}
-        autoFocus
-        className="min-h-12 w-full rounded-sm border-2 px-6 font-display text-lg font-bold text-slate-800 sm:w-auto"
-        style={{ borderColor: color }}
-      >
-        เข้าด่าน
-      </button>
-    </section>
-  );
-}
-
 export function QuestionCard({
   item,
   number,
@@ -609,7 +337,7 @@ function rankOf(pct: number) {
   return { rank: "C", note: "ลองอ่านคำอธิบายข้อที่พลาดด้านล่าง แล้วถามครูได้เลย" };
 }
 
-export function Results({ data, courseId }: { data: GamePayload; courseId: string }) {
+export function Results({ data, courseId, hero }: { data: GamePayload; courseId: string; hero?: React.ReactNode }) {
   const score = Number(data.score);
   const max = Number(data.max_score);
   const pct = max ? (score / max) * 100 : 0;
@@ -617,7 +345,7 @@ export function Results({ data, courseId }: { data: GamePayload; courseId: strin
   const right = data.items.filter((it) => data.feedback[it.id]?.ok).length;
   const [best] = useState(() => {
     try {
-      return (JSON.parse(localStorage.getItem(`game:${data.play_id}`) ?? "{}") as Partial<Local>).best ?? 0;
+      return (JSON.parse(localStorage.getItem(`game:${data.play_id}`) ?? "{}") as { best?: number }).best ?? 0;
     } catch {
       return 0;
     }
@@ -627,6 +355,7 @@ export function Results({ data, courseId }: { data: GamePayload; courseId: strin
   return (
     <div className="space-y-5">
       <section className="stage-enter space-y-4 rounded-sm border-2 border-porcelain bg-white p-6 text-center">
+        {hero}
         <h1 className="font-display text-2xl font-bold text-slate-800">ภารกิจสำเร็จ</h1>
         <p className="-mt-2 text-slate-600">{data.title}</p>
         <div className="flex items-center justify-center gap-6">
