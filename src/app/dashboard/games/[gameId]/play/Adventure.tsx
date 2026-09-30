@@ -6,7 +6,8 @@ import QuizText from "@/components/QuizText";
 import { unitTrace } from "@/lib/traces";
 import { gameErrorMessage, type GameFeedback, type GameItem, type GamePayload, type GameStage } from "@/lib/game";
 import { QuestionCard } from "./GamePlayer";
-import { CHARACTERS, CharacterSprite, EnemySprite, Heart, Skyline, StageProps, STAGE_SCENES, type CharacterId } from "./sprites";
+import { CHARACTERS, CharacterSprite, Heart, type CharacterId } from "./sprites";
+import { FarLayer, groundOf, MidLayer, skyOf, THEMES, ThemedEnemy, themeOf } from "./themes";
 
 const HEARTS = 3;
 const WALK_MS = 1600;
@@ -215,8 +216,11 @@ export function Adventure({ data, onFinished }: { data: GamePayload; onFinished:
   const stageInfo = data.stages[stage - 1];
   // แต่ละเกมกำหนดชื่อฉากและภาพฉากของด่านเองได้ (ไม่กำหนด = ตามลำดับด่าน)
   const art = stageInfo?.art ?? stage;
-  const sceneName = stageInfo?.scene ?? STAGE_SCENES[(stage - 1) % STAGE_SCENES.length];
+  const theme = themeOf(data.theme);
+  const themeScenes = THEMES.find((t) => t.id === theme)!.scenes;
+  const sceneName = stageInfo?.scene ?? themeScenes[(art - 1) % themeScenes.length];
   const color = stageColor(stage);
+  const ground = groundOf(theme, color);
   const isBoss = index === items.length - 1;
   const stageItems = items.filter((x) => x.stage === stage);
   const posInStage = item ? stageItems.indexOf(item) + 1 : stageItems.length;
@@ -226,17 +230,17 @@ export function Adventure({ data, onFinished }: { data: GamePayload; onFinished:
       {/* ---------- ฉาก ---------- */}
       <div
         className={`adv-scene relative -mx-4 h-[34vh] min-h-[210px] max-h-[380px] sm:h-[44vh] overflow-hidden border-y-2 sm:mx-0 sm:rounded-sm sm:border-2 ${beat === "walk" ? "is-walking" : ""}`}
-        style={{ borderColor: color, background: `linear-gradient(to bottom, color-mix(in oklch, ${color} 10%, var(--c-slate-50)), var(--c-slate-50))` }}
+        style={{ borderColor: color, background: skyOf(theme, color) }}
       >
         {/* ชั้นไกล/กลาง/พื้น เลื่อนต่างความเร็ว */}
         <div className="adv-layer adv-far absolute inset-x-0 bottom-[22%] h-[55%] w-[200%] opacity-80">
-          <Skyline color={color} />
+          <FarLayer theme={theme} color={color} />
         </div>
         <div className="adv-layer adv-mid absolute inset-x-0 bottom-[20%] h-[50%] w-[200%]">
-          <StageProps stage={art} color={color} />
+          <MidLayer theme={theme} art={art} color={color} />
         </div>
-        <div className="absolute inset-x-0 bottom-0 h-[20%] border-t-2" style={{ borderColor: color, background: "var(--c-slate-100)" }}>
-          <div className="adv-layer adv-ground h-full w-[200%]" style={{ backgroundImage: `repeating-linear-gradient(90deg, transparent 0 38px, color-mix(in oklch, ${color} 45%, transparent) 38px 40px)` }} />
+        <div className="absolute inset-x-0 bottom-0 h-[20%] border-t-2" style={{ borderColor: color, background: ground.background }}>
+          <div className="adv-layer adv-ground h-full w-[200%]" style={{ background: ground.stripes }} />
         </div>
 
         {/* HUD */}
@@ -276,7 +280,7 @@ export function Adventure({ data, onFinished }: { data: GamePayload; onFinished:
             {isBoss && beat !== "walk" && (
               <span className="absolute -top-5 left-1/2 -translate-x-1/2 rounded-sm bg-[var(--c-red-500)] px-1.5 font-display text-xs font-bold text-[oklch(100%_0_0)]">บอส</span>
             )}
-            <EnemySprite stage={art} boss={isBoss} className="h-auto w-full" />
+            <ThemedEnemy theme={theme} art={art} boss={isBoss} className="h-auto w-full" />
           </div>
         )}
 

@@ -841,3 +841,38 @@ html {
     animation-duration: 1ms;
   }
 }
+
+/* ธีมใต้สมุทร: ฟองอากาศลอยขึ้น · สาหร่าย/หนวดแมงกะพรุนโยก */
+@keyframes sprite-bubble {
+  from {
+    transform: translateY(0);
+    opacity: 0.9;
+  }
+  to {
+    transform: translateY(-150px);
+    opacity: 0;
+  }
+}
+.sprite-bubble {
+  animation: sprite-bubble 3.2s ease-in infinite;
+}
+@keyframes sprite-sway {
+  0%,
+  100% {
+    transform: rotate(-6deg);
+  }
+  50% {
+    transform: rotate(6deg);
+  }
+}
+.sprite-sway {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: sprite-sway 2.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sprite-bubble,
+  .sprite-sway {
+    animation: none;
+  }
+}

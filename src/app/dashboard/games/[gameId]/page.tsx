@@ -10,6 +10,7 @@ import { unitTrace } from "@/lib/traces";
 import QuizText from "@/components/QuizText";
 import { CHOICE_LETTERS, formatNumber, type Game, type GameItem, type GamePlay, type GameSession } from "@/lib/game";
 import Breadcrumbs from "../../Breadcrumbs";
+import { FarLayer, THEMES, ThemedEnemy, themeOf, type ThemeId } from "./play/themes";
 
 type Tab = "items" | "sessions" | "results";
 type Key = { item_id: string; correct_index: number | null; answer: number | null; tolerance: number; explanation: string | null };
@@ -121,6 +122,8 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
             {error}
           </p>
         )}
+
+        <ThemePicker gameId={game.id} value={themeOf(game.theme)} onChanged={load} />
 
         <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-slate-200" style={{ "--neon": "var(--trace-magenta)" } as React.CSSProperties}>
           {tabs.map((t) => (
@@ -492,5 +495,62 @@ function ResultsView({
         </table>
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+/** ธีมของเกม — เปลี่ยนได้ตลอด คนที่กำลังเล่นอยู่จะเห็นธีมใหม่เมื่อเปิดหน้าเกมอีกครั้ง */
+function ThemePicker({ gameId, value, onChanged }: { gameId: string; value: ThemeId; onChanged: () => void }) {
+  const supabase = createClient();
+  const [busy, setBusy] = useState<ThemeId | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function choose(id: ThemeId) {
+    if (id === value) return;
+    setBusy(id);
+    const { error: e } = await supabase.from("games").update({ theme: id }).eq("id", gameId);
+    setBusy(null);
+    if (e) return setError(dbErrorMessage(e));
+    setError(null);
+    onChanged();
+  }
+
+  return (
+    <fieldset className="space-y-2">
+      <legend className="font-display font-semibold text-slate-800">ธีมของเกม</legend>
+      <div role="radiogroup" className="grid grid-cols-3 gap-2 sm:max-w-xl">
+        {THEMES.map((t) => {
+          const on = t.id === value;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              disabled={busy !== null}
+              onClick={() => choose(t.id)}
+              className={`overflow-hidden rounded-sm border-2 text-left transition-colors disabled:opacity-60 ${
+                on ? "border-trace-cyan" : "border-slate-200 hover:border-slate-400"
+              }`}
+            >
+              {/* ตัวอย่างฉาก: พื้นหลังของธีม + ศัตรูตัวแรก */}
+              <span className="relative block h-16 overflow-hidden bg-[var(--c-slate-50)]">
+                <span className="absolute inset-0 w-[200%]">
+                  <FarLayer theme={t.id} color="var(--trace-magenta)" />
+                </span>
+                <ThemedEnemy theme={t.id} art={1} className="absolute bottom-1 right-2 h-12 w-12" />
+              </span>
+              <span className="block px-2 py-1.5">
+                <span className="block font-display text-sm font-semibold text-slate-800">
+                  {busy === t.id ? "กำลังเปลี่ยน..." : t.name}
+                </span>
+                <span className="block text-[11px] leading-tight text-slate-500">{t.line}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {error && <p className="text-sm text-red-700">{error}</p>}
+    </fieldset>
   );
 }

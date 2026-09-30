@@ -21,6 +21,8 @@ export type Game = {
   description: string | null;
   stages: GameStage[];
   seconds_per_item: number;
+  /** ธีมของฉากในเกม: cyber (เมืองนีออน) · ocean (ใต้สมุทร) · space (อวกาศ) */
+  theme: string;
   created_at: string;
 };
 
@@ -51,6 +53,7 @@ export type GamePayload = {
   play_id: string;
   title: string;
   description: string | null;
+  theme?: string;
   stages: GameStage[];
   seconds_per_item: number;
   finished: boolean;
