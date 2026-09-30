@@ -23,6 +23,7 @@ export default async function DashboardPage() {
 
   const links = [
     { href: "/dashboard/courses", label: "รายวิชาของฉัน", note: isTeacher ? "กรอกคะแนน · นักเรียน · สื่อการสอน" : "ดูคะแนนและสื่อการสอน", color: "var(--trace-magenta)" },
+    { href: "/dashboard/guide/physics5-final", label: "แนวข้อสอบปลายภาค ฟิสิกส์ 5", note: "หัวข้อ · สูตร · จุดที่ต้องระวัง", color: "var(--trace-cyan)" },
     ...(isTeacher
       ? [{ href: "/dashboard/admin", label: "จัดการวิชา / ปีการศึกษา", note: "เปิดวิชา ตั้งเทอม", color: "var(--trace-cyan)" }]
       : []),
