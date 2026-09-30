@@ -3,7 +3,9 @@
 import { use, useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { gameErrorMessage, type GamePayload, type GameStage } from "@/lib/game";
-import { BackLink, Intro, Playing, Results } from "./GamePlayer";
+import { BackLink, Intro, Results } from "./GamePlayer";
+import { Adventure, CharacterPicker, loadCharacter } from "./Adventure";
+import { CharacterSprite, type CharacterId } from "./sprites";
 
 type Phase =
   | { kind: "loading" }
@@ -22,6 +24,11 @@ export default function PlayGamePage({ params }: { params: Promise<{ gameId: str
   const { gameId } = use(params);
   const supabase = createClient();
   const [phase, setPhase] = useState<Phase>({ kind: "loading" });
+  const [character, setCharacter] = useState<CharacterId>("robot");
+  useEffect(() => {
+    const t = setTimeout(() => setCharacter(loadCharacter()), 0);
+    return () => clearTimeout(t);
+  }, []);
 
   const start = useCallback(
     async (courseId: string) => {
@@ -70,16 +77,26 @@ export default function PlayGamePage({ params }: { params: Promise<{ gameId: str
           </div>
         )}
 
-        {phase.kind === "intro" && <Intro phase={phase} onStart={() => start(phase.courseId)} />}
+        {phase.kind === "intro" && (
+          <Intro phase={phase} onStart={() => start(phase.courseId)}>
+            <CharacterPicker value={character} onChange={setCharacter} />
+          </Intro>
+        )}
 
         {phase.kind === "playing" && (
-          <Playing
+          <Adventure
             data={phase.data}
             onFinished={(data) => setPhase({ kind: "done", data, courseId: phase.courseId })}
           />
         )}
 
-        {phase.kind === "done" && <Results data={phase.data} courseId={phase.courseId} />}
+        {phase.kind === "done" && (
+          <Results
+            data={phase.data}
+            courseId={phase.courseId}
+            hero={<CharacterSprite id={character} className="sprite-idle mx-auto h-24 w-auto" />}
+          />
+        )}
       </div>
     </div>
   );
