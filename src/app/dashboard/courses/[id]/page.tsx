@@ -13,8 +13,9 @@ import MaterialsPanel from "./MaterialsPanel";
 import GradeScalePanel from "./GradeScalePanel";
 import StudentRoute from "./StudentRoute";
 import QuizzesPanel from "./QuizzesPanel";
+import GamesPanel from "./GamesPanel";
 
-type Tab = "units" | "scores" | "students" | "materials" | "grade" | "quizzes";
+type Tab = "units" | "scores" | "students" | "materials" | "grade" | "quizzes" | "games";
 type CourseInfo = { code: string; name: string; year: number | null; semester: number | null };
 
 export default function CoursePage({ params }: { params: Promise<{ id: string }> }) {
@@ -166,6 +167,7 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
     { key: "scores", label: "กรอกคะแนน", teacherOnly: true },
     { key: "students", label: "นักเรียน", teacherOnly: true },
     { key: "quizzes", label: "แบบทดสอบ" },
+    { key: "games", label: "เกม" },
     { key: "materials", label: "สื่อการสอน" },
     { key: "grade", label: "คะแนนของฉัน" },
   ];
@@ -243,6 +245,10 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
             myEnrollmentId={myEnrollment?.id ?? null}
             myClassroom={myEnrollment?.class_roster?.classroom ?? null}
           />
+        )}
+
+        {activeTab === "games" && (
+          <GamesPanel courseId={courseId} isTeacher={isTeacher} myClassroom={myEnrollment?.class_roster?.classroom ?? null} />
         )}
 
         {activeTab === "materials" && (
