@@ -18,6 +18,24 @@ import GamesPanel from "./GamesPanel";
 type Tab = "units" | "scores" | "students" | "materials" | "grade" | "quizzes" | "games";
 type CourseInfo = { code: string; name: string; year: number | null; semester: number | null };
 
+// Supabase ตอบกลับสูงสุด 1,000 แถวต่อคำขอ — วิชาที่มีคะแนนเกินนั้นต้องดึงทีละหน้า
+// ไม่งั้นคะแนนที่กรอกทีหลัง (เช่น ปลายภาค) จะหายไปจากหน้าจอเงียบ ๆ
+const SCORE_PAGE = 1000;
+async function loadAllScores(supabase: ReturnType<typeof createClient>, enrollIds: string[]) {
+  const rows: ScoreRow[] = [];
+  for (let from = 0; ; from += SCORE_PAGE) {
+    const { data, error } = await supabase
+      .from("student_scores")
+      .select("enrollment_id, source_type, source_id, score")
+      .in("enrollment_id", enrollIds)
+      .order("id")
+      .range(from, from + SCORE_PAGE - 1);
+    if (error) return { data: rows, error };
+    rows.push(...((data as ScoreRow[]) ?? []));
+    if (!data || data.length < SCORE_PAGE) return { data: rows, error: null };
+  }
+}
+
 export default function CoursePage({ params }: { params: Promise<{ id: string }> }) {
   const { id: courseId } = use(params);
   const supabase = createClient();
@@ -95,9 +113,7 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
       unitIds.length
         ? supabase.from("unit_components").select("id, unit_id, category, max_score").in("unit_id", unitIds)
         : Promise.resolve({ data: [], error: null }),
-      enrollIds.length
-        ? supabase.from("student_scores").select("enrollment_id, source_type, source_id, score").in("enrollment_id", enrollIds)
-        : Promise.resolve({ data: [], error: null }),
+      enrollIds.length ? loadAllScores(supabase, enrollIds) : Promise.resolve({ data: [], error: null }),
     ]);
 
     const firstError = [profileRes, courseRes, unitRes, examRes, enrollRes, materialRes, scaleRes, compRes, scoreRes]
