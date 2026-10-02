@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import QuizText from "@/components/QuizText";
 import { unitTrace } from "@/lib/traces";
 import { gameErrorMessage, type GameFeedback, type GameItem, type GamePayload } from "@/lib/game";
-import { QuestionCard } from "./GamePlayer";
+import { BriefPanel, ExitLink, GameScreen, PanelNote, QuestionPanel, SCENE_SIZE } from "./GameScreen";
 import { loadCharacter, loadLocal, saveLocal, type Local } from "./Adventure";
 import { CHARACTERS, CharacterSprite, Heart, type CharacterId } from "./sprites";
 import { FarLayer, skyOf, ThemedEnemy, themeOf, type ThemeId } from "./themes";
@@ -37,7 +37,7 @@ const HERO_MOVES: Record<CharacterId, string> = { robot: "เลเซอร์�
  */
 type Beat = "intro" | "ask" | "fx" | "explain" | "outro";
 
-export function Battle({ data, onFinished }: { data: GamePayload; onFinished: (d: GamePayload) => void }) {
+export function Battle({ data, courseId, onFinished }: { data: GamePayload; courseId: string; onFinished: (d: GamePayload) => void }) {
   const supabase = createClient();
   const items = data.items;
   const theme = themeOf(data.theme);
@@ -166,148 +166,147 @@ export function Battle({ data, onFinished }: { data: GamePayload; onFinished: (d
 
   const heroName = CHARACTERS.find((c) => c.id === character)!.name;
 
-  return (
-    <div className="space-y-3">
-      {/* ---------- สนามต่อสู้ ---------- */}
-      <div
-        className="relative -mx-4 h-[36vh] min-h-[230px] max-h-[400px] overflow-hidden border-y-2 sm:mx-0 sm:h-[46vh] sm:rounded-sm sm:border-2"
-        style={{ borderColor: color, background: skyOf(theme, color) }}
-      >
-        <div className="absolute inset-x-0 top-0 h-[60%] w-[200%] opacity-70">
-          <FarLayer theme={theme} color={color} />
-        </div>
-        {/* แท่นของบอส (ขวาบน) และของเรา (ซ้ายล่าง) */}
-        <span aria-hidden className="absolute right-[6%] top-[44%] h-[12%] w-[38%] rounded-[50%]" style={{ background: `color-mix(in oklch, ${color} 30%, var(--c-slate-200))`, boxShadow: `0 6px 18px -6px ${color}` }} />
-        <span aria-hidden className="absolute bottom-[4%] left-[4%] h-[12%] w-[40%] rounded-[50%]" style={{ background: `color-mix(in oklch, var(--trace-cyan) 25%, var(--c-slate-200))` }} />
+  const sceneNode = (
+    <div
+      className={SCENE_SIZE}
+      style={{ borderColor: color, background: skyOf(theme, color) }}
+    >
+      <div className="absolute inset-x-0 top-0 h-[60%] w-[200%] opacity-70">
+        <FarLayer theme={theme} color={color} />
+      </div>
+      {/* แท่นของบอส (ขวาบน) และของเรา (ซ้ายล่าง) */}
+      <span aria-hidden className="absolute right-[6%] top-[44%] h-[12%] w-[38%] rounded-[50%]" style={{ background: `color-mix(in oklch, ${color} 30%, var(--c-slate-200))`, boxShadow: `0 6px 18px -6px ${color}` }} />
+      <span aria-hidden className="absolute bottom-[4%] left-[4%] h-[12%] w-[40%] rounded-[50%]" style={{ background: `color-mix(in oklch, var(--trace-cyan) 25%, var(--c-slate-200))` }} />
 
-        {/* ป้ายบอส */}
-        {item !== undefined || beat === "outro" ? (
-          <div className="absolute left-3 top-3 w-[46%] max-w-56 rounded-sm border-2 bg-[color-mix(in_oklch,var(--c-white)_88%,transparent)] px-2 py-1.5" style={{ borderColor: color }}>
-            <p className="truncate font-display text-xs font-bold text-slate-800 sm:text-sm">{bossName}</p>
-            <div className="mt-1 flex items-center gap-1.5">
-              <span className="font-display text-[10px] font-bold text-[var(--c-red-500)]">HP</span>
-              <span className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200">
-                <span
-                  className="block h-full rounded-full transition-[width] duration-700 ease-out"
-                  style={{ width: `${bossMax ? (bossHp / bossMax) * 100 : 0}%`, background: bossHp / bossMax > 0.5 ? "var(--trace-lime)" : bossHp / bossMax > 0.2 ? "var(--trace-yellow)" : "var(--c-red-500)" }}
-                />
-              </span>
-              <span className="font-num tnum text-[10px] text-slate-600">
-                {bossHp}/{bossMax}
-              </span>
-            </div>
-          </div>
-        ) : null}
+      <span className="absolute left-2 top-[max(0.5rem,env(safe-area-inset-top))]">
+        <ExitLink courseId={courseId} />
+      </span>
 
-        {/* บอส */}
-        <div
-          key={`boss-${stage}`}
-          className={`absolute right-[12%] top-[10%] w-[30%] max-w-44 ${beat === "intro" ? "battle-boss-enter" : ""} ${beat === "fx" && lastOk ? "battle-boss-hit" : ""} ${
-            beat === "fx" && lastOk === false ? "battle-boss-attack" : ""
-          } ${beat === "outro" && bossDown ? "adv-enemy-down" : ""} ${beat === "outro" && !bossDown ? "battle-boss-flee" : ""}`}
-        >
-          <ThemedEnemy theme={theme} art={art} boss className="h-auto w-full" />
-          {hit && beat === "fx" && lastOk && (
-            <span key={hit.key} aria-hidden className="xp-pop absolute left-1/2 top-0 -translate-x-1/2 font-display text-2xl font-bold text-[var(--c-red-500)]">
-              −{hit.dmg}
+      {/* ป้ายบอส */}
+      {item !== undefined || beat === "outro" ? (
+        <div className="absolute left-12 top-[max(0.5rem,env(safe-area-inset-top))] w-[42%] max-w-56 rounded-sm border-2 bg-[color-mix(in_oklch,var(--c-white)_88%,transparent)] px-2 py-1.5" style={{ borderColor: color }}>
+          <p className="truncate font-display text-xs font-bold text-slate-800 sm:text-sm">{bossName}</p>
+          <div className="mt-1 flex items-center gap-1.5">
+            <span className="font-display text-[10px] font-bold text-[var(--c-red-500)]">HP</span>
+            <span className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200">
+              <span
+                className="block h-full rounded-full transition-[width] duration-700 ease-out"
+                style={{ width: `${bossMax ? (bossHp / bossMax) * 100 : 0}%`, background: bossHp / bossMax > 0.5 ? "var(--trace-lime)" : bossHp / bossMax > 0.2 ? "var(--trace-yellow)" : "var(--c-red-500)" }}
+              />
             </span>
-          )}
-        </div>
-
-        {/* ตัวเรา */}
-        <div className={`absolute bottom-[9%] left-[12%] w-[20%] max-w-28 ${beat === "fx" && lastOk === false ? "adv-hurt" : ""} ${beat === "fx" && lastOk ? "battle-hero-lunge" : ""}`}>
-          <CharacterSprite id={character} className="sprite-idle h-auto w-full" />
-        </div>
-
-        {/* ป้ายของเรา */}
-        <div className="absolute bottom-3 right-3 rounded-sm border-2 border-trace-cyan bg-[color-mix(in_oklch,var(--c-white)_88%,transparent)] px-2 py-1.5 text-right">
-          <p className="font-display text-xs font-bold text-slate-800 sm:text-sm">{heroName}</p>
-          <span className="flex justify-end">{Array.from({ length: HEARTS }, (_, i) => <Heart key={i} full={i < hearts} />)}</span>
-          <p className="font-num tnum text-[11px] text-slate-600">
-            <b className="text-trace-cyan">{Math.round(local.xp).toLocaleString()}</b> XP · {score}/{Number(data.max_score)}
-          </p>
-        </div>
-
-        {/* กระสุน: ของเราพุ่งไปขวาบน · ของบอสพุ่งมาซ้ายล่าง */}
-        {beat === "fx" && lastOk && (
-          <span aria-hidden className="battle-shot absolute bottom-[26%] left-[28%] size-5 rounded-full" style={{ background: "var(--trace-cyan)", boxShadow: "0 0 16px var(--trace-cyan)" }} />
-        )}
-        {beat === "fx" && lastOk === false && (
-          <span aria-hidden className="battle-shot-back absolute right-[26%] top-[28%] size-5 rounded-full" style={{ background: "var(--c-red-500)", boxShadow: "0 0 16px var(--c-red-500)" }} />
-        )}
-
-        {/* ป้ายบอสปรากฏตัว */}
-        {beat === "intro" && item && (
-          <div className="stage-enter absolute inset-x-4 bottom-[18%] mx-auto max-w-sm space-y-2 rounded-sm border-2 bg-[color-mix(in_oklch,var(--c-white)_92%,transparent)] p-3 text-center" style={{ borderColor: color }}>
-            <p className="font-display text-lg font-bold text-slate-800">
-              <span style={{ color }}>ด่าน {stage}</span> · {bossName} ปรากฏตัว!
-            </p>
-            {stageInfo?.intro && (
-              <p className="text-sm text-slate-600">
-                {stageInfo.title && <b className="text-slate-800">{stageInfo.title} · </b>}
-                <QuizText text={stageInfo.intro} />
-              </p>
-            )}
-            <button
-              type="button"
-              autoFocus
-              onClick={() => setBeat("ask")}
-              className="min-h-12 w-full rounded-sm px-6 font-display text-lg font-bold text-[oklch(100%_0_0)]"
-              style={{ background: `color-mix(in oklch, ${color} 70%, black)` }}
-            >
-              สู้!
-            </button>
+            <span className="font-num tnum text-[10px] text-slate-600">
+              {bossHp}/{bossMax}
+            </span>
           </div>
-        )}
+        </div>
+      ) : null}
 
-        {/* จบด่าน */}
-        {beat === "outro" && (
-          <div className="stage-enter absolute inset-x-4 bottom-[18%] mx-auto max-w-sm space-y-2 rounded-sm border-2 bg-[color-mix(in_oklch,var(--c-white)_92%,transparent)] p-3 text-center" style={{ borderColor: color }}>
-            <p className="font-display text-lg font-bold text-slate-800">{bossDown ? `ชนะ! ${bossName} ล้มแล้ว` : `${bossName} หนีไปได้!`}</p>
-            <p className="text-sm text-slate-600">
-              {bossDown ? "ตอบถูกทุกข้อในด่านนี้ สุดยอด!" : `บอสเหลือ HP ${bossHp} — ข้อที่พลาดดูคำอธิบายซ้ำได้ตอนจบเกม`}
-            </p>
-            <button type="button" autoFocus onClick={advance} className="min-h-12 w-full rounded-sm border-2 border-porcelain font-display text-lg font-bold text-slate-800">
-              {items[index + 1] ? "ด่านต่อไป" : "สรุปผลภารกิจ"}
-            </button>
-          </div>
-        )}
-
-        {revived && beat === "explain" && (
-          <p className="stage-enter absolute inset-x-0 top-16 text-center font-display text-sm font-bold text-trace-yellow">พลังหมด! ฟื้นพลังเต็มแล้ว สู้ต่อ</p>
+      {/* บอส */}
+      <div
+        key={`boss-${stage}`}
+        className={`absolute right-[12%] top-[10%] w-[30%] max-w-44 ${beat === "intro" ? "battle-boss-enter" : ""} ${beat === "fx" && lastOk ? "battle-boss-hit" : ""} ${
+          beat === "fx" && lastOk === false ? "battle-boss-attack" : ""
+        } ${beat === "outro" && bossDown ? "adv-enemy-down" : ""} ${beat === "outro" && !bossDown ? "battle-boss-flee" : ""}`}
+      >
+        <ThemedEnemy theme={theme} art={art} boss className="h-auto w-full" />
+        {hit && beat === "fx" && lastOk && (
+          <span key={hit.key} aria-hidden className="xp-pop absolute left-1/2 top-0 -translate-x-1/2 font-display text-2xl font-bold text-[var(--c-red-500)]">
+            −{hit.dmg}
+          </span>
         )}
       </div>
 
+      {/* ตัวเรา */}
+      <div className={`absolute bottom-[9%] left-[12%] w-[20%] max-w-28 ${beat === "fx" && lastOk === false ? "adv-hurt" : ""} ${beat === "fx" && lastOk ? "battle-hero-lunge" : ""}`}>
+        <CharacterSprite id={character} className="sprite-idle h-auto w-full" />
+      </div>
+
+      {/* ป้ายของเรา */}
+      <div className="absolute bottom-2 right-2 rounded-sm border-2 border-trace-cyan bg-[color-mix(in_oklch,var(--c-white)_88%,transparent)] px-2 py-1.5 text-right">
+        <p className="font-display text-xs font-bold text-slate-800 sm:text-sm">{heroName}</p>
+        <span className="flex justify-end">{Array.from({ length: HEARTS }, (_, i) => <Heart key={i} full={i < hearts} />)}</span>
+        <p className="font-num tnum text-[11px] text-slate-600">
+          <b className="text-trace-cyan">{Math.round(local.xp).toLocaleString()}</b> XP · {score}/{Number(data.max_score)}
+        </p>
+      </div>
+
+      {/* กระสุน: ของเราพุ่งไปขวาบน · ของบอสพุ่งมาซ้ายล่าง */}
+      {beat === "fx" && lastOk && (
+        <span aria-hidden className="battle-shot absolute bottom-[26%] left-[28%] size-5 rounded-full" style={{ background: "var(--trace-cyan)", boxShadow: "0 0 16px var(--trace-cyan)" }} />
+      )}
+      {beat === "fx" && lastOk === false && (
+        <span aria-hidden className="battle-shot-back absolute right-[26%] top-[28%] size-5 rounded-full" style={{ background: "var(--c-red-500)", boxShadow: "0 0 16px var(--c-red-500)" }} />
+      )}
+
+      {/* ประกาศท่าที่เพิ่งออก */}
+      {beat === "fx" && lastOk !== null && item && (
+        <p className="stage-enter absolute inset-x-3 top-[46%] text-center font-display text-sm font-bold text-slate-800" aria-live="polite">
+          <span className="rounded-sm bg-[color-mix(in_oklch,var(--c-white)_88%,transparent)] px-2 py-1">
+            {lastOk ? `${heroName} ใช้ “${HERO_MOVES[character]}”! บอสเสีย HP ${Number(item.points)}` : `“${bossMove}” เข้าเต็ม ๆ! เสียหัวใจ 1 ดวง`}
+          </span>
+        </p>
+      )}
+
+      {revived && beat === "explain" && (
+        <p className="stage-enter absolute inset-x-0 top-16 text-center font-display text-sm font-bold text-trace-yellow">พลังหมด! ฟื้นพลังเต็มแล้ว สู้ต่อ</p>
+      )}
+    </div>
+  );
+
+  return (
+    <GameScreen scene={sceneNode}>
       {error && (
-        <p role="alert" className="rounded-sm border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <p role="alert" className="mx-4 mt-2 shrink-0 rounded-sm border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
           {error}
         </p>
       )}
 
-      {/* ---------- ประกาศท่า + โจทย์ ---------- */}
-      {item && (beat === "ask" || beat === "fx" || beat === "explain") && (
-        <div className="stage-enter space-y-2">
-          <p className="font-display text-sm font-semibold" style={{ color }} aria-live="polite">
-            {beat === "ask" && `${bossName} ใช้ท่า “${bossMove}”! ตอบให้ถูกเพื่อสวนกลับ`}
-            {beat !== "ask" && lastOk && `${heroName} ใช้ “${HERO_MOVES[character]}”! บอสเสีย HP ${Number(item.points)}`}
-            {beat !== "ask" && lastOk === false && `“${bossMove}” เข้าเต็ม ๆ! เสียหัวใจ 1 ดวง`}
-          </p>
-          <QuestionCard
-            key={item.id}
-            item={item}
-            number={index + 1}
-            total={items.length}
-            feedback={beat === "explain" ? feedback[item.id] : undefined}
-            busy={busy || beat === "fx"}
-            timeLeft={left}
-            timeTotal={data.seconds_per_item}
-            onSubmit={submit}
-            onNext={next}
-            isLast={false}
-          />
-        </div>
+      {item && beat === "intro" && (
+        <BriefPanel
+          title={
+            <>
+              <span style={{ color }}>ด่าน {stage}</span> · {bossName} ปรากฏตัว!
+            </>
+          }
+          color={color}
+          action="สู้!"
+          onAction={() => setBeat("ask")}
+        >
+          {stageInfo?.title && <b className="block text-base text-slate-800">{stageInfo.title}</b>}
+          {stageInfo?.intro && <QuizText text={stageInfo.intro} />}
+        </BriefPanel>
       )}
-      {!item && <p className="text-center text-sm text-slate-500">{busy ? "กำลังสรุปผลภารกิจ..." : "ผ่านครบทุกด่านแล้ว"}</p>}
-    </div>
+
+      {beat === "outro" && (
+        <BriefPanel
+          title={bossDown ? `ชนะ! ${bossName} ล้มแล้ว` : `${bossName} หนีไปได้!`}
+          color={color}
+          action={items[index + 1] ? "ด่านต่อไป" : "สรุปผลภารกิจ"}
+          onAction={advance}
+          primary={false}
+        >
+          {bossDown ? "ตอบถูกทุกข้อในด่านนี้ สุดยอด!" : `บอสเหลือ HP ${bossHp} — ข้อที่พลาดดูคำอธิบายซ้ำได้ตอนจบเกม`}
+        </BriefPanel>
+      )}
+
+      {item && (beat === "ask" || beat === "fx" || beat === "explain") && (
+        <QuestionPanel
+          key={item.id}
+          item={item}
+          number={index + 1}
+          total={items.length}
+          feedback={beat === "explain" ? feedback[item.id] : undefined}
+          busy={busy || beat === "fx"}
+          timeLeft={left}
+          timeTotal={data.seconds_per_item}
+          onSubmit={submit}
+          onNext={next}
+          nextLabel="ไปต่อ"
+          fireLabel="โจมตี"
+          caption={`${bossName} ใช้ท่า “${bossMove}”! ตอบให้ถูกเพื่อสวนกลับ`}
+        />
+      )}
+      {!item && beat !== "outro" && <PanelNote>{busy ? "กำลังสรุปผลภารกิจ..." : "ผ่านครบทุกด่านแล้ว"}</PanelNote>}
+    </GameScreen>
   );
 }

@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import QuizText from "@/components/QuizText";
 import { unitTrace } from "@/lib/traces";
 import { gameErrorMessage, type GameFeedback, type GameItem, type GamePayload, type GameStage } from "@/lib/game";
-import { QuestionCard } from "./GamePlayer";
+import { BriefPanel, ExitLink, GameScreen, PanelNote, QuestionPanel, SCENE_SIZE } from "./GameScreen";
 import { CHARACTERS, CharacterSprite, Heart, type CharacterId } from "./sprites";
 import { FarLayer, groundOf, MidLayer, skyOf, THEMES, ThemedEnemy, themeOf } from "./themes";
 
@@ -90,7 +90,7 @@ export function saveLocal(playId: string, v: Local) {
  */
 type Beat = "stage" | "walk" | "ask" | "fx" | "explain";
 
-export function Adventure({ data, onFinished }: { data: GamePayload; onFinished: (d: GamePayload) => void }) {
+export function Adventure({ data, courseId, onFinished }: { data: GamePayload; courseId: string; onFinished: (d: GamePayload) => void }) {
   const supabase = createClient();
   const items = data.items;
   const [character, setCharacter] = useState<CharacterId>("robot");
@@ -225,139 +225,134 @@ export function Adventure({ data, onFinished }: { data: GamePayload; onFinished:
   const stageItems = items.filter((x) => x.stage === stage);
   const posInStage = item ? stageItems.indexOf(item) + 1 : stageItems.length;
 
-  return (
-    <div className="space-y-3">
-      {/* ---------- ฉาก ---------- */}
-      <div
-        className={`adv-scene relative -mx-4 h-[34vh] min-h-[210px] max-h-[380px] sm:h-[44vh] overflow-hidden border-y-2 sm:mx-0 sm:rounded-sm sm:border-2 ${beat === "walk" ? "is-walking" : ""}`}
-        style={{ borderColor: color, background: skyOf(theme, color) }}
-      >
-        {/* ชั้นไกล/กลาง/พื้น เลื่อนต่างความเร็ว */}
-        <div className="adv-layer adv-far absolute inset-x-0 bottom-[22%] h-[55%] w-[200%] opacity-80">
-          <FarLayer theme={theme} color={color} />
-        </div>
-        <div className="adv-layer adv-mid absolute inset-x-0 bottom-[20%] h-[50%] w-[200%]">
-          <MidLayer theme={theme} art={art} color={color} />
-        </div>
-        <div className="absolute inset-x-0 bottom-0 h-[20%] border-t-2" style={{ borderColor: color, background: ground.background }}>
-          <div className="adv-layer adv-ground h-full w-[200%]" style={{ background: ground.stripes }} />
-        </div>
-
-        {/* HUD */}
-        <div className="absolute inset-x-0 top-0 flex items-center gap-2 px-3 py-2">
-          <span className="flex">{Array.from({ length: HEARTS }, (_, i) => <Heart key={i} full={i < hearts} />)}</span>
-          <span className="min-w-0 flex-1 truncate font-display text-xs font-semibold text-slate-700 sm:text-sm">
-            ด่าน {stage} · {sceneName} · {posInStage}/{stageItems.length}
-          </span>
-          {local.streak >= 2 && <span className="rounded-sm border-2 border-trace-yellow px-1.5 font-display text-xs font-bold text-trace-yellow">×{local.streak}</span>}
-          <span className="relative font-num tnum text-xs text-slate-600 sm:text-sm">
-            <b className="text-trace-cyan">{Math.round(local.xp).toLocaleString()}</b> XP
-            {gain && (
-              <span key={gain.key} aria-hidden className="xp-pop absolute -bottom-5 right-0 font-display text-sm font-bold text-trace-lime">
-                +{gain.xp}
-              </span>
-            )}
-          </span>
-          <span className="font-num tnum text-base font-bold text-slate-800" aria-label={`คะแนน ${score} จาก ${Number(data.max_score)}`}>
-            {score}
-            <span className="text-xs font-normal text-slate-500">/{Number(data.max_score)}</span>
-          </span>
-        </div>
-
-        {/* ตัวละคร */}
-        <div className={`absolute bottom-[19%] left-[10%] w-[18%] max-w-24 ${beat === "fx" && lastOk === false ? "adv-hurt" : ""}`}>
-          <CharacterSprite id={character} className={`h-auto w-full ${beat === "walk" ? "sprite-walking" : "sprite-idle"}`} />
-        </div>
-
-        {/* ศัตรู / บอส */}
-        {item && beat !== "stage" && (
-          <div
-            key={item.id}
-            className={`absolute bottom-[19%] right-[10%] ${isBoss ? "w-[30%] max-w-40" : "w-[20%] max-w-28"} ${beat === "walk" ? "adv-enemy-enter" : ""} ${
-              (beat === "fx" || beat === "explain") && lastOk ? "adv-enemy-down" : ""
-            } ${beat === "fx" && lastOk === false ? "adv-enemy-attack" : ""}`}
-          >
-            {isBoss && beat !== "walk" && (
-              <span className="absolute -top-5 left-1/2 -translate-x-1/2 rounded-sm bg-[var(--c-red-500)] px-1.5 font-display text-xs font-bold text-[oklch(100%_0_0)]">บอส</span>
-            )}
-            <ThemedEnemy theme={theme} art={art} boss={isBoss} className="h-auto w-full" />
-          </div>
-        )}
-
-        {/* ลำแสงจากตัวละครไปศัตรู / ระเบิด */}
-        {beat === "fx" && lastOk && (
-          <>
-            <span aria-hidden className="adv-beam absolute bottom-[34%] left-[26%] right-[22%] h-1.5 origin-left rounded-full" style={{ background: `linear-gradient(90deg, var(--trace-cyan), ${color})`, boxShadow: `0 0 12px ${color}` }} />
-            <span aria-hidden className="adv-burst absolute bottom-[26%] right-[14%] size-20">
-              {Array.from({ length: 8 }, (_, i) => (
-                <span key={i} className="absolute left-1/2 top-1/2 size-2.5 rounded-full" style={{ background: i % 2 ? color : "var(--trace-yellow)", transform: `rotate(${i * 45}deg) translateX(0)`, ["--a" as string]: `${i * 45}deg` }} />
-              ))}
-            </span>
-          </>
-        )}
-        {beat === "fx" && lastOk === false && (
-          <span aria-hidden className="adv-zap absolute bottom-[30%] left-[24%] right-[24%] h-1 origin-right rounded-full bg-[var(--c-red-500)]" />
-        )}
-
-        {/* ป้ายเข้าด่าน */}
-        {beat === "stage" && item && (
-          <div className="stage-enter absolute inset-x-4 top-1/2 mx-auto max-w-sm -translate-y-1/2 space-y-3 rounded-sm border-2 bg-[color-mix(in_oklch,var(--c-white)_92%,transparent)] p-4 text-center" style={{ borderColor: color }}>
-            <h2 className="font-display text-xl font-bold text-slate-800">
-              <span style={{ color }}>ด่าน {stage}</span> · {sceneName}
-            </h2>
-            <StageBrief info={data.stages[stage - 1]} count={stageItems.length} />
-            <button
-              type="button"
-              autoFocus
-              onClick={() => setBeat("walk")}
-              className="min-h-12 w-full rounded-sm px-6 font-display text-lg font-bold text-[oklch(100%_0_0)]"
-              style={{ background: `color-mix(in oklch, ${color} 70%, black)` }}
-            >
-              ลุย!
-            </button>
-          </div>
-        )}
-
-        {rebooted && beat === "explain" && (
-          <p className="stage-enter absolute inset-x-0 top-10 text-center font-display text-sm font-bold text-trace-yellow">พลังหมด! รีบูตระบบ หัวใจเต็มแล้ว ลุยต่อ</p>
-        )}
+  const sceneNode = (
+    <div
+      className={`adv-scene ${SCENE_SIZE} ${beat === "walk" ? "is-walking" : ""}`}
+      style={{ borderColor: color, background: skyOf(theme, color) }}
+    >
+      {/* ชั้นไกล/กลาง/พื้น เลื่อนต่างความเร็ว */}
+      <div className="adv-layer adv-far absolute inset-x-0 bottom-[22%] h-[55%] w-[200%] opacity-80">
+        <FarLayer theme={theme} color={color} />
+      </div>
+      <div className="adv-layer adv-mid absolute inset-x-0 bottom-[20%] h-[50%] w-[200%]">
+        <MidLayer theme={theme} art={art} color={color} />
+      </div>
+      <div className="absolute inset-x-0 bottom-0 h-[20%] border-t-2" style={{ borderColor: color, background: ground.background }}>
+        <div className="adv-layer adv-ground h-full w-[200%]" style={{ background: ground.stripes }} />
       </div>
 
+      {/* HUD */}
+      <div className="absolute inset-x-0 top-0 flex items-center gap-2 px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
+        <ExitLink courseId={courseId} />
+        <span className="flex">{Array.from({ length: HEARTS }, (_, i) => <Heart key={i} full={i < hearts} />)}</span>
+        <span className="min-w-0 flex-1 truncate font-display text-xs font-semibold text-slate-700 sm:text-sm">
+          ด่าน {stage} · {sceneName} · {posInStage}/{stageItems.length}
+        </span>
+        {local.streak >= 2 && <span className="rounded-sm border-2 border-trace-yellow px-1.5 font-display text-xs font-bold text-trace-yellow">×{local.streak}</span>}
+        <span className="relative font-num tnum text-xs text-slate-600 sm:text-sm">
+          <b className="text-trace-cyan">{Math.round(local.xp).toLocaleString()}</b> XP
+          {gain && (
+            <span key={gain.key} aria-hidden className="xp-pop absolute -bottom-5 right-0 font-display text-sm font-bold text-trace-lime">
+              +{gain.xp}
+            </span>
+          )}
+        </span>
+        <span className="font-num tnum text-base font-bold text-slate-800" aria-label={`คะแนน ${score} จาก ${Number(data.max_score)}`}>
+          {score}
+          <span className="text-xs font-normal text-slate-500">/{Number(data.max_score)}</span>
+        </span>
+      </div>
+
+      {/* ตัวละคร */}
+      <div className={`absolute bottom-[19%] left-[10%] w-[18%] max-w-24 ${beat === "fx" && lastOk === false ? "adv-hurt" : ""}`}>
+        <CharacterSprite id={character} className={`h-auto w-full ${beat === "walk" ? "sprite-walking" : "sprite-idle"}`} />
+      </div>
+
+      {/* ศัตรู / บอส */}
+      {item && beat !== "stage" && (
+        <div
+          key={item.id}
+          className={`absolute bottom-[19%] right-[10%] ${isBoss ? "w-[30%] max-w-40" : "w-[20%] max-w-28"} ${beat === "walk" ? "adv-enemy-enter" : ""} ${
+            (beat === "fx" || beat === "explain") && lastOk ? "adv-enemy-down" : ""
+          } ${beat === "fx" && lastOk === false ? "adv-enemy-attack" : ""}`}
+        >
+          {isBoss && beat !== "walk" && (
+            <span className="absolute -top-5 left-1/2 -translate-x-1/2 rounded-sm bg-[var(--c-red-500)] px-1.5 font-display text-xs font-bold text-[oklch(100%_0_0)]">บอส</span>
+          )}
+          <ThemedEnemy theme={theme} art={art} boss={isBoss} className="h-auto w-full" />
+        </div>
+      )}
+
+      {/* ลำแสงจากตัวละครไปศัตรู / ระเบิด */}
+      {beat === "fx" && lastOk && (
+        <>
+          <span aria-hidden className="adv-beam absolute bottom-[34%] left-[26%] right-[22%] h-1.5 origin-left rounded-full" style={{ background: `linear-gradient(90deg, var(--trace-cyan), ${color})`, boxShadow: `0 0 12px ${color}` }} />
+          <span aria-hidden className="adv-burst absolute bottom-[26%] right-[14%] size-20">
+            {Array.from({ length: 8 }, (_, i) => (
+              <span key={i} className="absolute left-1/2 top-1/2 size-2.5 rounded-full" style={{ background: i % 2 ? color : "var(--trace-yellow)", transform: `rotate(${i * 45}deg) translateX(0)`, ["--a" as string]: `${i * 45}deg` }} />
+            ))}
+          </span>
+        </>
+      )}
+      {beat === "fx" && lastOk === false && (
+        <span aria-hidden className="adv-zap absolute bottom-[30%] left-[24%] right-[24%] h-1 origin-right rounded-full bg-[var(--c-red-500)]" />
+      )}
+
+      {rebooted && beat === "explain" && (
+        <p className="stage-enter absolute inset-x-0 top-12 text-center font-display text-sm font-bold text-trace-yellow">พลังหมด! รีบูตระบบ หัวใจเต็มแล้ว ลุยต่อ</p>
+      )}
+    </div>
+  );
+
+  return (
+    <GameScreen scene={sceneNode}>
       {error && (
-        <p role="alert" className="rounded-sm border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <p role="alert" className="mx-4 mt-2 shrink-0 rounded-sm border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
           {error}
         </p>
       )}
 
-      {/* ---------- โจทย์ ---------- */}
-      {item && (beat === "ask" || beat === "fx" || beat === "explain") && (
-        <div className="stage-enter">
-          <QuestionCard
-            key={item.id}
-            item={item}
-            number={index + 1}
-            total={items.length}
-            feedback={beat === "explain" ? feedback[item.id] : undefined}
-            busy={busy || beat === "fx"}
-            timeLeft={left}
-            timeTotal={data.seconds_per_item}
-            onSubmit={submit}
-            onNext={next}
-            isLast={index === items.length - 1}
-          />
-        </div>
+      {item && beat === "stage" && (
+        <BriefPanel
+          title={
+            <>
+              <span style={{ color }}>ด่าน {stage}</span> · {sceneName}
+            </>
+          }
+          color={color}
+          action="ลุย!"
+          onAction={() => setBeat("walk")}
+        >
+          <StageBrief info={data.stages[stage - 1]} count={stageItems.length} />
+        </BriefPanel>
       )}
-      {item && beat === "walk" && <p className="text-center text-sm text-slate-500">กำลังวิ่งไปข้างหน้า...</p>}
-      {!item && <p className="text-center text-sm text-slate-500">{busy ? "กำลังสรุปผลภารกิจ..." : "ผ่านครบทุกด่านแล้ว"}</p>}
-    </div>
+      {item && beat === "walk" && <PanelNote>กำลังวิ่งไปข้างหน้า...</PanelNote>}
+      {item && (beat === "ask" || beat === "fx" || beat === "explain") && (
+        <QuestionPanel
+          key={item.id}
+          item={item}
+          number={index + 1}
+          total={items.length}
+          feedback={beat === "explain" ? feedback[item.id] : undefined}
+          busy={busy || beat === "fx"}
+          timeLeft={left}
+          timeTotal={data.seconds_per_item}
+          onSubmit={submit}
+          onNext={next}
+          nextLabel={index === items.length - 1 ? "สรุปผลภารกิจ" : "ไปต่อ"}
+          fireLabel="ยิง"
+        />
+      )}
+      {!item && <PanelNote>{busy ? "กำลังสรุปผลภารกิจ..." : "ผ่านครบทุกด่านแล้ว"}</PanelNote>}
+    </GameScreen>
   );
 }
 
 function StageBrief({ info, count }: { info: GameStage | undefined; count: number }) {
   return (
-    <p className="text-sm text-slate-600">
-      {info?.title && <b className="block text-slate-800">{info.title}</b>}
+    <>
+      {info?.title && <b className="block text-base text-slate-800">{info.title}</b>}
       {info?.intro && <QuizText text={info.intro} />} · ศัตรู {count} ตัว
-    </p>
+    </>
   );
 }

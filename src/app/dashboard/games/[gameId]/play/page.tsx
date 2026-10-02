@@ -86,10 +86,10 @@ export default function PlayGamePage({ params }: { params: Promise<{ gameId: str
 
         {/* รูปแบบการเล่นตามที่ครูตั้งไว้ในเกม: บอสแบทเทิล หรือวิ่งข้ามด่าน */}
         {phase.kind === "playing" && phase.data.mode === "battle" && (
-          <Battle data={phase.data} onFinished={(data) => setPhase({ kind: "done", data, courseId: phase.courseId })} />
+          <Battle data={phase.data} courseId={phase.courseId} onFinished={(data) => setPhase({ kind: "done", data, courseId: phase.courseId })} />
         )}
         {phase.kind === "playing" && phase.data.mode !== "battle" && (
-          <Adventure data={phase.data} onFinished={(data) => setPhase({ kind: "done", data, courseId: phase.courseId })} />
+          <Adventure data={phase.data} courseId={phase.courseId} onFinished={(data) => setPhase({ kind: "done", data, courseId: phase.courseId })} />
         )}
 
         {phase.kind === "done" && (
