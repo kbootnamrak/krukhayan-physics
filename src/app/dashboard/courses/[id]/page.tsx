@@ -14,8 +14,9 @@ import GradeScalePanel from "./GradeScalePanel";
 import StudentRoute from "./StudentRoute";
 import QuizzesPanel from "./QuizzesPanel";
 import GamesPanel from "./GamesPanel";
+import AssignmentsPanel from "./AssignmentsPanel";
 
-type Tab = "units" | "scores" | "students" | "materials" | "grade" | "quizzes" | "games";
+type Tab = "units" | "scores" | "students" | "materials" | "grade" | "quizzes" | "games" | "assignments";
 type CourseInfo = { code: string; name: string; year: number | null; semester: number | null };
 
 // Supabase ตอบกลับสูงสุด 1,000 แถวต่อคำขอ — วิชาที่มีคะแนนเกินนั้นต้องดึงทีละหน้า
@@ -182,6 +183,7 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
     { key: "units", label: "หน่วยการเรียนรู้", teacherOnly: true },
     { key: "scores", label: "กรอกคะแนน", teacherOnly: true },
     { key: "students", label: "นักเรียน", teacherOnly: true },
+    { key: "assignments", label: "งาน" },
     { key: "quizzes", label: "แบบทดสอบ" },
     { key: "games", label: "เกม" },
     { key: "materials", label: "สื่อการสอน" },
@@ -251,6 +253,17 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
 
         {activeTab === "students" && isTeacher && (
           <StudentsPanel courseId={courseId} roster={roster} onChanged={load} />
+        )}
+
+        {activeTab === "assignments" && (
+          <AssignmentsPanel
+            courseId={courseId}
+            isTeacher={isTeacher}
+            units={units}
+            components={components}
+            enrollments={enrollments}
+            myEnrollmentId={myEnrollment?.id ?? null}
+          />
         )}
 
         {activeTab === "quizzes" && (
