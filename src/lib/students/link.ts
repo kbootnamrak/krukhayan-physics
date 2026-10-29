@@ -85,7 +85,11 @@ export async function linkStudentToRoster(
   }
 
   // ย้ายครบแล้ว บัญชี PIN ไม่มีรายชื่อเหลือ — ลบทิ้ง (ฟังก์ชันนี้ไม่ลบถ้ายังมีการลงทะเบียนผูกอยู่)
-  for (const holder of pinHolders) await detachAndDeleteStudentUser(admin, holder);
+  // ย้าย PIN ไปบัญชี Google ก่อน นักเรียนจะใช้ PIN เดิมเข้าได้ต่อ ไม่ต้องขอใหม่
+  for (const holder of pinHolders) {
+    await admin.rpc("student_pin_transfer", { p_from: holder, p_to: user.id });
+    await detachAndDeleteStudentUser(admin, holder);
+  }
 
   return { ok: true, studentCode, enrolled };
 }

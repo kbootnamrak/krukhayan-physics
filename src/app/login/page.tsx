@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { SCHOOL_EMAIL_DOMAIN } from "@/lib/school";
 import { authErrorMessage } from "@/lib/auth-error";
-import { pinEmail } from "@/lib/students/pin";
+import { loginEmailsFor } from "@/lib/students/pin";
 import AuthHashNotice from "@/app/AuthHashNotice";
 import { ChipMark, PhysicsHero } from "@/components/PhysicsArt";
 
@@ -151,8 +151,8 @@ function LoginForm() {
 }
 
 /**
- * สำหรับนักเรียนที่เข้าด้วยอีเมลโรงเรียนไม่ได้ (ลืมรหัสผ่าน / ยังไม่มีบัญชี)
- * ครูสร้าง PIN ให้ในแท็บ "นักเรียน" — ที่นี่พิมพ์รหัสนักเรียน + PIN
+ * นักเรียนทุกคนเข้าด้วยรหัสนักเรียน + PIN ได้ (ครูสร้าง PIN ให้ในแท็บ "นักเรียน")
+ * ลองบัญชีอีเมลโรงเรียนก่อน (คนที่เคยเข้าด้วย Google) ไม่ผ่านจึงลองบัญชี PIN
  */
 function PinLoginForm() {
   const router = useRouter();
@@ -170,7 +170,12 @@ function PinLoginForm() {
     setLoading(true);
     setError(null);
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email: pinEmail(c), password: p });
+    let error: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>["error"] = null;
+    for (const email of loginEmailsFor(c, SCHOOL_EMAIL_DOMAIN)) {
+      ({ error } = await supabase.auth.signInWithPassword({ email, password: p }));
+      // ผิดรหัส/ไม่มีบัญชีนี้ → ลองบัญชีถัดไป · ข้อผิดพลาดอื่น (เน็ต, ถูกจำกัด) หยุดเลย
+      if (!error || !error.message.includes("Invalid login credentials")) break;
+    }
     if (error) {
       setLoading(false);
       return setError(
@@ -188,7 +193,7 @@ function PinLoginForm() {
   return (
     <details className="w-full max-w-sm group">
       <summary className="cursor-pointer list-none text-center text-sm text-slate-600 hover:text-slate-800">
-        นักเรียนที่เข้าอีเมลโรงเรียนไม่ได้ <span className="underline underline-offset-2">เข้าด้วยรหัสนักเรียน + PIN</span>
+        นักเรียน <span className="underline underline-offset-2">เข้าด้วยรหัสนักเรียน + PIN</span>
       </summary>
       <form onSubmit={handlePin} className="mt-3 bg-white p-5 rounded-sm border-2 border-slate-300 space-y-3">
         <p className="text-sm text-slate-600">ขอ PIN 6 หลักจากครูผู้สอน แล้วกรอกด้านล่าง</p>

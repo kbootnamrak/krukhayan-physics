@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import * as XLSX from "xlsx";
+import PinBulk, { type PinStatus } from "./PinBulk";
 import { createClient } from "@/lib/supabase/client";
 import { dbErrorMessage } from "@/lib/db-error";
 import { SCHOOL_EMAIL_DOMAIN } from "@/lib/school";
@@ -58,10 +59,13 @@ export default function StudentsPanel({
   courseId,
   roster,
   onChanged,
+  courseLabel = "",
 }: {
   courseId: string;
   roster: RosterRow[];
   onChanged: () => void;
+  /** ชื่อวิชาบนบัตร PIN และชื่อไฟล์ Excel */
+  courseLabel?: string;
 }) {
   const supabase = createClient();
   const [busy, setBusy] = useState(false);
@@ -122,8 +126,9 @@ export default function StudentsPanel({
     return [...others].map((u) => nameOfUser.get(u) ?? "บัญชีนอกวิชานี้");
   }
 
-  // PIN สำหรับนักเรียนที่เข้าอีเมลโรงเรียนไม่ได้
-  const [pinRosterIds, setPinRosterIds] = useState<Set<string>>(new Set());
+  // PIN เข้าระบบ — นักเรียนทุกคนมีได้ (ทั้งคนที่เข้าด้วย Google แล้วและคนที่ยังไม่เคยเข้า)
+  const [pinStatus, setPinStatus] = useState<Map<string, PinStatus>>(new Map());
+  const hasPin = (id: string) => !!pinStatus.get(id)?.hasPin;
   // PIN ที่เพิ่งสร้าง แสดงใต้แถวของนักเรียนคนนั้น (เดิมแสดงบนสุดของรายชื่อ ครูที่เลื่อนลงมากดไม่เห็น)
   const [issued, setIssued] = useState<{ rosterId: string; name: string; studentCode: string; pin: string } | null>(null);
   const [pinError, setPinError] = useState<{ rosterId: string; message: string } | null>(null);
@@ -132,7 +137,9 @@ export default function StudentsPanel({
   const loadPins = useCallback(async () => {
     const res = await fetch(`/api/students/pin?courseId=${encodeURIComponent(courseId)}`);
     const json = await res.json().catch(() => null);
-    if (res.ok && json?.rosterIds) setPinRosterIds(new Set(json.rosterIds as string[]));
+    if (res.ok && Array.isArray(json?.status)) {
+      setPinStatus(new Map((json.status as ({ rosterId: string } & PinStatus)[]).map((x) => [x.rosterId, { account: x.account, hasPin: x.hasPin }])));
+    }
   }, [courseId]);
 
   useEffect(() => {
@@ -141,8 +148,14 @@ export default function StudentsPanel({
   }, [loadPins, roster]);
 
   async function pinAction(r: RosterRow, action: "issue" | "revoke") {
-    if (action === "issue" && pinRosterIds.has(r.id) && !window.confirm(`สร้าง PIN ใหม่ให้ ${r.full_name}?\nPIN เดิมจะใช้ไม่ได้ทันที`)) return;
-    if (action === "revoke" && !window.confirm(`ยกเลิก PIN ของ ${r.full_name}?\nนักเรียนจะเข้าด้วย PIN ไม่ได้อีก (คะแนนยังอยู่ครบ)`)) return;
+    if (action === "issue" && hasPin(r.id) && !window.confirm(`สร้าง PIN ใหม่ให้ ${r.full_name}?\nPIN เดิมจะใช้ไม่ได้ทันที`)) return;
+    if (
+      action === "revoke" &&
+      !window.confirm(
+        `ยกเลิก PIN ของ ${r.full_name}?\nนักเรียนจะเข้าด้วย PIN ไม่ได้อีก (คะแนนยังอยู่ครบ${pinStatus.get(r.id)?.account === "google" ? " · ยังเข้าด้วย Google ได้" : ""})`
+      )
+    )
+      return;
     setPinBusy(r.id);
     setPinError(null);
     const res = await fetch("/api/students/pin", {
@@ -348,6 +361,15 @@ export default function StudentsPanel({
         </p>
       )}
 
+      <PinBulk
+        courseId={courseId}
+        rows={shown}
+        status={pinStatus}
+        scopeLabel={activeRoom ? `ห้อง ${activeRoom} ` : "ทุกคนในวิชา "}
+        courseLabel={courseLabel}
+        onDone={loadPins}
+      />
+
       {sharedDevices.length > 0 && (
         <div className="text-sm text-amber-900 bg-amber-50 border border-amber-300 rounded-sm px-3 py-2 space-y-1">
           <p className="font-semibold">พบเครื่องที่ถูกใช้โดยบัญชีนักเรียนหลายคน {sharedDevices.length} เครื่อง</p>
@@ -399,19 +421,26 @@ export default function StudentsPanel({
                   aria-hidden
                   className={`size-1.5 rounded-full ${r.claimed_by ? "bg-green-600" : "border border-slate-400"}`}
                 />
-                {pinRosterIds.has(r.id) ? "เข้าด้วย PIN" : r.claimed_by ? "เข้าระบบแล้ว" : "ยังไม่เคยเข้า"}
+                {pinStatus.get(r.id)?.account === "pin"
+                  ? "เข้าด้วย PIN"
+                  : r.claimed_by
+                    ? hasPin(r.id)
+                      ? "Google + PIN"
+                      : "เข้าระบบแล้ว"
+                    : "ยังไม่เคยเข้า"}
               </span>
-              {/* PIN: สร้างให้คนที่ยังไม่เคยเข้า หรือเปลี่ยน/ยกเลิกของคนที่ใช้ PIN อยู่ (คนที่เข้าด้วย Google แล้วไม่ต้องใช้) */}
-              {(!r.claimed_by || pinRosterIds.has(r.id)) && (
+              {/* PIN: ทุกคนสร้างได้ · คนที่มีแล้วเปลี่ยน/ยกเลิกได้ */}
+              {(
+
                 <button
                   onClick={() => pinAction(r, "issue")}
                   disabled={busy || pinBusy === r.id}
                   className="min-h-11 whitespace-nowrap rounded-sm border border-slate-300 px-3 text-sm text-slate-700 hover:border-slate-500 hover:text-slate-800 disabled:opacity-50 sm:min-h-0 sm:px-2 sm:py-1 sm:text-xs sm:text-slate-600"
                 >
-                  {pinBusy === r.id ? "..." : pinRosterIds.has(r.id) ? "PIN ใหม่" : "สร้าง PIN"}
+                  {pinBusy === r.id ? "..." : hasPin(r.id) ? "PIN ใหม่" : "สร้าง PIN"}
                 </button>
               )}
-              {pinRosterIds.has(r.id) && (
+              {hasPin(r.id) && (
                 <button
                   onClick={() => pinAction(r, "revoke")}
                   disabled={busy || pinBusy === r.id}
