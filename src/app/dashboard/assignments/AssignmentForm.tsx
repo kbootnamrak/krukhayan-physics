@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { dbErrorMessage } from "@/lib/db-error";
 import {
@@ -33,6 +33,7 @@ export default function AssignmentForm({
   rooms,
   onSaved,
   onCancel,
+  focusAttach = false,
 }: {
   courseId: string;
   initial?: Assignment;
@@ -40,6 +41,8 @@ export default function AssignmentForm({
   rooms: string[];
   onSaved: (a: Assignment) => void;
   onCancel: () => void;
+  /** เปิดฟอร์มจากปุ่ม "แนบไฟล์งาน" — เลื่อนไปที่ส่วนแนบไฟล์ */
+  focusAttach?: boolean;
 }) {
   const supabase = createClient();
   const [title, setTitle] = useState(initial?.title ?? "");
@@ -56,6 +59,10 @@ export default function AssignmentForm({
   const [pending, setPending] = useState<File[]>([]);
   const [linkText, setLinkText] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const attachRef = useRef<HTMLFieldSetElement>(null);
+  useEffect(() => {
+    if (focusAttach) attachRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+  }, [focusAttach]);
   // งานใหม่ที่บันทึกไปแล้วแต่อัปโหลดไฟล์ไม่ครบ — กดบันทึกซ้ำต้องแก้แถวเดิม ไม่สร้างงานซ้ำ
   const savedRef = useRef<Assignment | null>(null);
 
@@ -163,19 +170,7 @@ export default function AssignmentForm({
         />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1">
-          <label htmlFor="as-due" className={label}>กำหนดส่ง</label>
-          <input id="as-due" type="datetime-local" value={due} onChange={(e) => setDue(e.target.value)} className={field} />
-          <p className="text-xs text-slate-500">ส่งเลยกำหนดได้ ระบบติดป้าย &quot;ส่งช้า&quot; ให้ · เว้นว่าง = ไม่กำหนด</p>
-        </div>
-        <div className="space-y-1">
-          <label htmlFor="as-max" className={label}>คะแนนเต็มของงาน</label>
-          <input id="as-max" inputMode="decimal" value={maxScore} onChange={(e) => setMaxScore(e.target.value)} className={field} />
-        </div>
-      </div>
-
-      <fieldset className="min-w-0 space-y-2">
+      <fieldset ref={attachRef} id="as-attach" className="min-w-0 scroll-mt-4 space-y-2">
         <legend className={label}>
           ไฟล์งาน / ใบงาน <span className="font-normal text-slate-500">(ไม่บังคับ)</span>
         </legend>
@@ -249,6 +244,18 @@ export default function AssignmentForm({
           &quot;ทุกคนที่มีลิงก์ดูได้&quot; · อัปโหลดได้ไฟล์ละไม่เกิน 20 MB
         </p>
       </fieldset>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-1">
+          <label htmlFor="as-due" className={label}>กำหนดส่ง</label>
+          <input id="as-due" type="datetime-local" value={due} onChange={(e) => setDue(e.target.value)} className={field} />
+          <p className="text-xs text-slate-500">ส่งเลยกำหนดได้ ระบบติดป้าย &quot;ส่งช้า&quot; ให้ · เว้นว่าง = ไม่กำหนด</p>
+        </div>
+        <div className="space-y-1">
+          <label htmlFor="as-max" className={label}>คะแนนเต็มของงาน</label>
+          <input id="as-max" inputMode="decimal" value={maxScore} onChange={(e) => setMaxScore(e.target.value)} className={field} />
+        </div>
+      </div>
 
       <fieldset className="min-w-0 space-y-2">
         <legend className={label}>นักเรียนส่งงานเป็น</legend>

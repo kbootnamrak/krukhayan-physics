@@ -49,7 +49,7 @@ export default function TeacherAssignment({
   const router = useRouter();
   const [a, setA] = useState(initial);
   const [subs, setSubs] = useState<Submission[]>(initialSubs);
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState<false | "all" | "attach">(false);
   const [room, setRoom] = useState<string>("all");
   const [filter, setFilter] = useState<Filter>("all");
   const [selected, setSelected] = useState<string | null>(null);
@@ -180,6 +180,7 @@ export default function TeacherAssignment({
       {editing ? (
         <AssignmentForm
           courseId={a.course_id}
+          focusAttach={editing === "attach"}
           initial={a}
           componentOptions={componentOptions}
           rooms={rooms}
@@ -209,14 +210,26 @@ export default function TeacherAssignment({
             <Info label="นักเรียนส่งเป็น" value={SUBMIT_MODE_LABEL[a.submit_mode]} />
           </dl>
           {a.instructions && <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{a.instructions}</p>}
-          {a.attachments.length > 0 && (
+          {a.attachments.length > 0 ? (
             <div className="space-y-1.5">
               <p className="text-sm font-medium text-slate-700">ไฟล์งานที่แนบให้นักเรียน</p>
               <FileGallery files={a.attachments} bucket={ATTACH_BUCKET} />
             </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setEditing("attach")}
+              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-sm border-2 border-dashed border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:border-trace-cyan hover:text-slate-800"
+            >
+              <svg viewBox="0 0 24 24" className="size-5 text-trace-cyan" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" />
+                <path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
+              </svg>
+              แนบไฟล์งาน / ลิงก์ให้นักเรียน
+            </button>
           )}
           <div className="flex flex-wrap gap-2 pt-1">
-            <SmallButton onClick={() => setEditing(true)}>แก้ไข</SmallButton>
+            <SmallButton onClick={() => setEditing("all")}>แก้ไข / แนบไฟล์</SmallButton>
             <SmallButton onClick={togglePublished}>{a.published ? "ซ่อนจากนักเรียน" : "เผยแพร่"}</SmallButton>
             <SmallButton onClick={exportExcel}>ดาวน์โหลด Excel</SmallButton>
             {!a.files_purged_at && studentPaths.length > 0 && (
