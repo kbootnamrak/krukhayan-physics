@@ -1,19 +1,29 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
- * เข้าระบบด้วยรหัสนักเรียน + PIN (สำหรับนักเรียนที่ใช้อีเมลโรงเรียนไม่ได้)
+ * เข้าระบบด้วยรหัสนักเรียน + PIN (นักเรียนทุกคนใช้ได้)
  *
- * ครูกดสร้าง PIN ให้เป็นรายคน ระบบสร้างบัญชี Supabase ให้ด้วยอีเมลสมมติ
+ * - นักเรียนที่เคยเข้าด้วย Google ของโรงเรียน: PIN เป็นรหัสผ่านของบัญชี Google เดิม
+ *   (อีเมล <รหัส>@โรงเรียน) และทำเครื่องหมาย app_metadata.pin = "on"
+ * - นักเรียนที่ยังไม่เคยเข้า: ระบบสร้างบัญชี Supabase ให้ด้วยอีเมลสมมติ
  * "<รหัสนักเรียน>@pin.krukhayan.invalid" (โดเมน .invalid ส่งอีเมลไม่ได้จริงตามมาตรฐาน)
  * และใช้ PIN เป็นรหัสผ่าน นักเรียนพิมพ์แค่รหัสนักเรียน + PIN หน้าเว็บแปลงเป็นอีเมลให้เอง
  *
  * ถ้าภายหลังนักเรียนเข้าด้วย Google ของโรงเรียนได้ การลงทะเบียน (และคะแนนทั้งหมด)
- * จะย้ายไปบัญชี Google ให้เอง แล้วบัญชี PIN ถูกลบ — ดู linkStudentToRoster
+ * จะย้ายไปบัญชี Google ให้เอง PIN ย้ายตามไป แล้วบัญชี PIN ถูกลบ — ดู linkStudentToRoster
+ *
+ * หน้าเข้าสู่ระบบลองอีเมลโรงเรียนก่อน ไม่ผ่านจึงลองอีเมลบัญชี PIN (loginEmailsFor)
  */
 export const PIN_EMAIL_DOMAIN = "pin.krukhayan.invalid";
 
 export function pinEmail(studentCode: string) {
   return `${studentCode.trim().toLowerCase()}@${PIN_EMAIL_DOMAIN}`;
+}
+
+/** อีเมลที่ลองตามลำดับตอนนักเรียนกรอกรหัส + PIN */
+export function loginEmailsFor(studentCode: string, schoolDomain: string) {
+  const code = studentCode.trim().toLowerCase();
+  return [`${code}@${schoolDomain}`, pinEmail(code)];
 }
 
 export function isPinEmail(email: string | null | undefined) {

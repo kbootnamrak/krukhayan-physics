@@ -252,7 +252,7 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
         )}
 
         {activeTab === "students" && isTeacher && (
-          <StudentsPanel courseId={courseId} roster={roster} onChanged={load} />
+          <StudentsPanel courseId={courseId} roster={roster} onChanged={load} courseLabel={`${course.code} ${course.name}`} />
         )}
 
         {activeTab === "assignments" && (
