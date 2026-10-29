@@ -1,12 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { dbErrorMessage } from "@/lib/db-error";
-import { fromLocalInput, toLocalInput, type Assignment, type ComponentOption } from "@/lib/assignments";
+import {
+  ATTACH_ACCEPT,
+  ATTACH_BUCKET,
+  attachmentPath,
+  formatBytes,
+  fromLocalInput,
+  itemKey,
+  normalizeUrl,
+  prepareAttachment,
+  storedPaths,
+  SUBMIT_MODE_LABEL,
+  toLocalInput,
+  type Assignment,
+  type ComponentOption,
+  type SubmissionFile,
+  type SubmitMode,
+} from "@/lib/assignments";
+import { FileGallery, RemoveButton } from "./[assignmentId]/files";
 
 /**
  * ฟอร์มสร้าง/แก้ไขงาน (ครู) — ใช้ทั้งแท็บ "งาน" ในหน้ารายวิชาและหน้างาน
+ * แนบไฟล์งาน/ใบงานให้นักเรียนได้ 2 แบบ: อัปโหลดไฟล์ หรือวางลิงก์ (Google Drive ฯลฯ ไม่กินพื้นที่)
  */
 export default function AssignmentForm({
   courseId,
@@ -32,6 +50,23 @@ export default function AssignmentForm({
   const [allRooms, setAllRooms] = useState(!initial?.rooms);
   const [picked, setPicked] = useState<string[]>(initial?.rooms ?? []);
   const [published, setPublished] = useState(initial?.published ?? true);
+  const [submitMode, setSubmitMode] = useState<SubmitMode>(initial?.submit_mode ?? "both");
+  // ไฟล์งานของครู: ที่แนบไว้แล้ว + ไฟล์ใหม่ที่ยังไม่อัปโหลด (อัปโหลดตอนกดบันทึก)
+  const [attached, setAttached] = useState<SubmissionFile[]>(initial?.attachments ?? []);
+  const [pending, setPending] = useState<File[]>([]);
+  const [linkText, setLinkText] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+  // งานใหม่ที่บันทึกไปแล้วแต่อัปโหลดไฟล์ไม่ครบ — กดบันทึกซ้ำต้องแก้แถวเดิม ไม่สร้างงานซ้ำ
+  const savedRef = useRef<Assignment | null>(null);
+
+  function addLink() {
+    const url = normalizeUrl(linkText);
+    if (!url) return setError("ลิงก์ไม่ถูกต้อง — คัดลอกลิงก์ทั้งหมดมาวาง เช่น https://drive.google.com/...");
+    if (attached.some((f) => f.url === url)) return setError("ใส่ลิงก์นี้ไปแล้ว");
+    setError(null);
+    setAttached((a) => [...a, { url, name: url }]);
+    setLinkText("");
+  }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,7 +78,7 @@ export default function AssignmentForm({
     if (!allRooms && picked.length === 0) return setError("เลือกห้องอย่างน้อย 1 ห้อง หรือเลือกทุกห้อง");
     setBusy(true);
     setError(null);
-    const row = {
+    const row: Record<string, unknown> = {
       course_id: courseId,
       title: title.trim(),
       instructions: instructions.trim() || null,
@@ -52,13 +87,54 @@ export default function AssignmentForm({
       component_id: componentId || null,
       rooms: allRooms ? null : picked,
       published,
+      submit_mode: submitMode,
     };
-    const res = initial
-      ? await supabase.from("assignments").update(row).eq("id", initial.id).select().single()
+    // งานใหม่ต้องได้ id ก่อน ไฟล์จึงอยู่ในโฟลเดอร์ของงาน
+    const existing = initial ?? savedRef.current;
+    const res = existing
+      ? await supabase.from("assignments").update(row).eq("id", existing.id).select().single()
       : await supabase.from("assignments").insert(row).select().single();
+    if (res.error) {
+      setBusy(false);
+      return setError(dbErrorMessage(res.error));
+    }
+    let saved = res.data as Assignment;
+    savedRef.current = saved;
+
+    const uploaded: SubmissionFile[] = [];
+    try {
+      for (const file of pending) {
+        const p = await prepareAttachment(file);
+        const path = attachmentPath(saved.id, p.ext);
+        const { error: upErr } = await supabase.storage.from(ATTACH_BUCKET).upload(path, p.blob, { contentType: p.type });
+        if (upErr) throw new Error(`อัปโหลด ${file.name} ไม่สำเร็จ: ${dbErrorMessage(upErr)}`);
+        uploaded.push({ path, name: p.name, size: p.blob.size, type: p.type });
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "อัปโหลดไฟล์ไม่สำเร็จ");
+    }
+    const next = [...attached, ...uploaded];
+    const before = existing?.attachments ?? [];
+    const removed = storedPaths(before).filter((p) => !storedPaths(next).includes(p));
+    if (next.length || before.length) {
+      const upd = await supabase.from("assignments").update({ attachments: next }).eq("id", saved.id).select().single();
+      if (upd.error) {
+        setBusy(false);
+        return setError(dbErrorMessage(upd.error));
+      }
+      saved = upd.data as Assignment;
+      if (removed.length) await supabase.storage.from(ATTACH_BUCKET).remove(removed);
+    }
     setBusy(false);
-    if (res.error) return setError(dbErrorMessage(res.error));
-    onSaved(res.data as Assignment);
+    // เก็บเฉพาะไฟล์ที่ยังอัปโหลดไม่สำเร็จไว้ให้ลองใหม่
+    setPending(pending.slice(uploaded.length));
+    // อัปโหลดไม่ครบ → งานบันทึกแล้ว แต่ให้ครูเห็นข้อความก่อน (กดบันทึกอีกครั้งเพื่อลองใหม่)
+    if (uploaded.length < pending.length) {
+      setAttached(saved.attachments);
+      savedRef.current = saved;
+      return;
+    }
+    onSaved(saved);
   }
 
   const field = "w-full rounded-sm border-2 border-slate-300 bg-white px-3 py-2 text-base text-slate-800 sm:text-sm";
@@ -99,6 +175,93 @@ export default function AssignmentForm({
         </div>
       </div>
 
+      <fieldset className="min-w-0 space-y-2">
+        <legend className={label}>
+          ไฟล์งาน / ใบงาน <span className="font-normal text-slate-500">(ไม่บังคับ)</span>
+        </legend>
+        {(attached.length > 0 || pending.length > 0) && (
+          <div className="space-y-2">
+            <FileGallery files={attached} bucket={ATTACH_BUCKET} onRemove={(key) => setAttached((a) => a.filter((f) => itemKey(f) !== key))} />
+            {pending.length > 0 && (
+              <ul className="space-y-1.5">
+                {pending.map((f, i) => (
+                  <li key={`${f.name}-${i}`} className="relative flex min-h-11 items-center gap-2 rounded-sm border-2 border-dashed border-trace-cyan py-1.5 pl-3 pr-11 text-sm text-slate-700">
+                    <span className="min-w-0 flex-1 truncate">{f.name}</span>
+                    <span className="shrink-0 text-xs text-slate-500">{formatBytes(f.size)} · อัปโหลดตอนบันทึก</span>
+                    <RemoveButton onClick={() => setPending((p) => p.filter((_, j) => j !== i))} label={`เอา ${f.name} ออก`} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+        <div className="flex gap-2">
+          <input
+            aria-label="ลิงก์ไฟล์งาน"
+            type="url"
+            inputMode="url"
+            autoCapitalize="off"
+            autoCorrect="off"
+            value={linkText}
+            onChange={(e) => setLinkText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addLink();
+              }
+            }}
+            placeholder="วางลิงก์ไฟล์งาน"
+            className={`${field} min-w-0 flex-1`}
+          />
+          <button
+            type="button"
+            disabled={!linkText.trim()}
+            onClick={addLink}
+            className="min-h-11 shrink-0 rounded-sm border-2 border-trace-cyan px-3 text-sm font-semibold text-slate-800 hover:bg-[color-mix(in_oklch,var(--trace-cyan)_12%,transparent)] disabled:opacity-40"
+          >
+            เพิ่มลิงก์
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="inline-flex min-h-11 items-center gap-2 rounded-sm border-2 border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100 sm:min-h-9"
+        >
+          <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M12 16V4M7 9l5-5 5 5M4 16v4h16v-4" />
+          </svg>
+          อัปโหลดไฟล์ (PDF, Word, PowerPoint, รูป)
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          multiple
+          accept={ATTACH_ACCEPT}
+          className="hidden"
+          onChange={(e) => {
+            const list = [...(e.target.files ?? [])];
+            e.target.value = "";
+            setPending((p) => [...p, ...list]);
+          }}
+        />
+        <p className="text-xs text-slate-500">
+          แนะนำวางลิงก์ Google Drive แทนการอัปโหลด — ไม่กินพื้นที่เก็บไฟล์ของระบบ (ฟรี 1 GB รวมทั้งเว็บ) · ตั้งแชร์เป็น
+          &quot;ทุกคนที่มีลิงก์ดูได้&quot; · อัปโหลดได้ไฟล์ละไม่เกิน 20 MB
+        </p>
+      </fieldset>
+
+      <fieldset className="min-w-0 space-y-2">
+        <legend className={label}>นักเรียนส่งงานเป็น</legend>
+        <div className="flex flex-wrap gap-2">
+          {(["both", "links", "files"] as SubmitMode[]).map((m) => (
+            <Chip key={m} on={submitMode === m} onClick={() => setSubmitMode(m)}>
+              {SUBMIT_MODE_LABEL[m]}
+            </Chip>
+          ))}
+        </div>
+        <p className="text-xs text-slate-500">งานที่เป็น PDF หรือไฟล์ใหญ่ เลือก &quot;ลิงก์เท่านั้น&quot; จะไม่กินพื้นที่เก็บไฟล์เลย</p>
+      </fieldset>
+
       <div className="space-y-1">
         <label htmlFor="as-comp" className={label}>คะแนนเข้าช่อง</label>
         <select id="as-comp" value={componentId} onChange={(e) => setComponentId(e.target.value)} className={field}>
@@ -117,7 +280,7 @@ export default function AssignmentForm({
       </div>
 
       {rooms.length > 0 && (
-        <fieldset className="space-y-2">
+        <fieldset className="min-w-0 space-y-2">
           <legend className={label}>มอบหมายให้</legend>
           <div className="flex flex-wrap gap-2">
             <Chip on={allRooms} onClick={() => setAllRooms(true)}>ทุกห้อง</Chip>

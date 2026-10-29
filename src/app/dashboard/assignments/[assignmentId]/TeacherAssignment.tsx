@@ -6,7 +6,10 @@ import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase/client";
 import { dbErrorMessage } from "@/lib/db-error";
 import {
+  ATTACH_BUCKET,
   BUCKET,
+  storedPaths,
+  SUBMIT_MODE_LABEL,
   formatDue,
   formatWhen,
   lateText,
@@ -96,13 +99,14 @@ export default function TeacherAssignment({
     const n = subs.filter((s) => s.files.length).length;
     if (!window.confirm(`ลบงาน "${a.title}" ?${n ? ` งานที่นักเรียนส่งมา ${n} คนจะหายทั้งหมด` : ""}${comp ? " และคะแนนในช่องที่ผูกไว้จะถูกคิดใหม่" : ""}`)) return;
     setBusy(true);
-    const paths = subs.flatMap((s) => [...s.files, ...s.history.flatMap((h) => h.files)].map((f) => f.path));
+    const paths = allStudentPaths(subs);
     const { error: e } = await supabase.from("assignments").delete().eq("id", a.id);
     if (e) {
       setBusy(false);
       return setError(dbErrorMessage(e));
     }
-    if (paths.length) await supabase.storage.from(BUCKET).remove(paths);
+    await removeInBatches(supabase, BUCKET, paths);
+    await removeInBatches(supabase, ATTACH_BUCKET, storedPaths(a.attachments));
     router.push(`/dashboard/courses/${a.course_id}`);
   }
 
@@ -118,6 +122,28 @@ export default function TeacherAssignment({
     const { data } = await supabase.from("assignment_submissions").select("*").eq("assignment_id", a.id);
     setSubs((data as Submission[]) ?? []);
     setBusy(false);
+  }
+
+  // ลบรูป/ไฟล์ที่นักเรียนส่งของงานนี้ออกจากที่เก็บ — คะแนน ความเห็น และลิงก์ยังอยู่
+  const studentPaths = allStudentPaths(subs);
+  async function purgeFiles() {
+    if (
+      !window.confirm(
+        `ลบรูป/ไฟล์ที่นักเรียนส่งในงานนี้ ${studentPaths.length} ไฟล์ ออกจากที่เก็บ?\nคะแนนและความเห็นยังอยู่ครบ แต่จะเปิดดูรูปงานไม่ได้อีก และนักเรียนส่งไฟล์เพิ่มไม่ได้ (ส่งเป็นลิงก์ได้)`
+      )
+    )
+      return;
+    setBusy(true);
+    setError(null);
+    const failed = await removeInBatches(supabase, BUCKET, studentPaths);
+    if (failed) {
+      setBusy(false);
+      return setError(failed);
+    }
+    const { data, error: e } = await supabase.from("assignments").update({ files_purged_at: new Date().toISOString() }).eq("id", a.id).select().single();
+    setBusy(false);
+    if (e) return setError(dbErrorMessage(e));
+    setA(data as Assignment);
   }
 
   function exportExcel() {
@@ -180,12 +206,24 @@ export default function TeacherAssignment({
             <Info label="คะแนนเต็ม" value={String(Number(a.max_score))} />
             <Info label="เข้าช่อง" value={comp ?? "ไม่ผูก"} />
             <Info label="มอบหมายให้" value={a.rooms ? a.rooms.join(", ") : "ทุกห้อง"} />
+            <Info label="นักเรียนส่งเป็น" value={SUBMIT_MODE_LABEL[a.submit_mode]} />
           </dl>
           {a.instructions && <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{a.instructions}</p>}
+          {a.attachments.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium text-slate-700">ไฟล์งานที่แนบให้นักเรียน</p>
+              <FileGallery files={a.attachments} bucket={ATTACH_BUCKET} />
+            </div>
+          )}
           <div className="flex flex-wrap gap-2 pt-1">
             <SmallButton onClick={() => setEditing(true)}>แก้ไข</SmallButton>
             <SmallButton onClick={togglePublished}>{a.published ? "ซ่อนจากนักเรียน" : "เผยแพร่"}</SmallButton>
             <SmallButton onClick={exportExcel}>ดาวน์โหลด Excel</SmallButton>
+            {!a.files_purged_at && studentPaths.length > 0 && (
+              <SmallButton onClick={purgeFiles} disabled={busy}>
+                ลบไฟล์ที่นักเรียนส่ง (เก็บคะแนนไว้)
+              </SmallButton>
+            )}
             <SmallButton onClick={remove} danger disabled={busy}>
               ลบงาน
             </SmallButton>
@@ -424,7 +462,7 @@ function Grader({
       )}
 
       {sub && sub.files.length > 0 ? (
-        <FileGallery files={sub.files} large />
+        <FileGallery files={sub.files} large purged={!!assignment.files_purged_at} />
       ) : (
         <p className="rounded-sm border-2 border-dashed border-slate-200 p-4 text-center text-sm text-slate-500">
           ไม่มีไฟล์ — ถ้านักเรียนส่งเป็นกระดาษ ให้คะแนนด้านล่างได้เลย
@@ -504,7 +542,7 @@ function Grader({
                   {h.score != null && ` · ${Number(h.score)}/${max}`}
                   {h.feedback && ` · ความเห็น: ${h.feedback}`}
                 </p>
-                <FileGallery files={h.files} />
+                <FileGallery files={h.files} purged={!!assignment.files_purged_at} />
               </div>
             ))}
           </div>
@@ -565,4 +603,18 @@ function NavButton({ disabled, onClick, label, dir }: { disabled: boolean; onCli
       </svg>
     </button>
   );
+}
+
+/** ไฟล์ทุกไฟล์ที่นักเรียนส่งในงานนี้ (รวมรอบก่อน ๆ) */
+function allStudentPaths(subs: Submission[]): string[] {
+  return subs.flatMap((s) => [...storedPaths(s.files), ...s.history.flatMap((h) => storedPaths(h.files))]);
+}
+
+/** ลบไฟล์จากที่เก็บทีละ 100 — คืนข้อความผิดพลาด หรือ null ถ้าสำเร็จ */
+async function removeInBatches(supabase: ReturnType<typeof createClient>, bucket: string, paths: string[]): Promise<string | null> {
+  for (let i = 0; i < paths.length; i += 100) {
+    const { error } = await supabase.storage.from(bucket).remove(paths.slice(i, i + 100));
+    if (error) return `ลบไฟล์ไม่สำเร็จ: ${dbErrorMessage(error)}`;
+  }
+  return null;
 }
