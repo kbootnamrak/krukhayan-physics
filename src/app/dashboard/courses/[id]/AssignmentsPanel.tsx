@@ -7,10 +7,12 @@ import { dbErrorMessage } from "@/lib/db-error";
 import {
   componentOptions,
   dueCountdown,
+  formatBytes,
   formatDue,
   lateText,
   STATUS_DOT,
   STATUS_LABEL,
+  STORAGE_QUOTA_BYTES,
   type Assignment,
   type StatusKey,
   type Submission,
@@ -44,6 +46,7 @@ export default function AssignmentsPanel({
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [subs, setSubs] = useState<Pick<Submission, "assignment_id" | "enrollment_id" | "status" | "score" | "submitted_at">[]>([]);
   const [creating, setCreating] = useState(false);
+  const [usedBytes, setUsedBytes] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     const { data: a, error: aErr } = await supabase.from("assignments").select("*").eq("course_id", courseId).order("due_at", { nullsFirst: false }).order("created_at");
@@ -55,6 +58,10 @@ export default function AssignmentsPanel({
     setError(firstErr ? dbErrorMessage(firstErr) : null);
     setAssignments((a as Assignment[]) ?? []);
     setSubs((sRes.data as typeof subs) ?? []);
+    if (isTeacher) {
+      const { data: bytes } = await supabase.rpc("submissions_storage_bytes");
+      setUsedBytes(bytes == null ? null : Number(bytes));
+    }
     setLoading(false);
   }, [courseId, isTeacher, myEnrollmentId, supabase]);
 
@@ -109,6 +116,8 @@ export default function AssignmentsPanel({
             สร้างงาน
           </button>
         )}
+
+        {usedBytes !== null && <StorageMeter used={usedBytes} />}
 
         {assignments.length === 0 ? (
           <p className="rounded-sm border border-slate-200 bg-white p-6 text-sm text-slate-500">
@@ -232,5 +241,27 @@ function AssignmentIcon() {
         <path d="M14 3v5h5M12 17v-6M9.5 13.5 12 11l2.5 2.5" />
       </svg>
     </span>
+  );
+}
+
+/** พื้นที่เก็บไฟล์งาน (ทุกวิชารวมกัน) เทียบกับโควตาฟรี 1 GB */
+function StorageMeter({ used }: { used: number }) {
+  const pct = Math.min(100, (used / STORAGE_QUOTA_BYTES) * 100);
+  const tone = pct >= 85 ? "bg-[var(--c-red-500)]" : pct >= 60 ? "bg-trace-yellow" : "bg-trace-lime";
+  return (
+    <div className="space-y-1.5 rounded-sm border border-slate-200 bg-white px-3 py-2.5">
+      <p className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
+        <span className="text-slate-700">พื้นที่ไฟล์งานที่ใช้ไป (ทุกวิชา)</span>
+        <span className="font-num tnum text-slate-800">
+          {formatBytes(used)} <span className="text-slate-500">/ 1 GB</span>
+        </span>
+      </p>
+      <span className="block h-2 overflow-hidden rounded-full bg-slate-200" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)} aria-label="พื้นที่ไฟล์งานที่ใช้ไป">
+        <span className={`block h-full rounded-full ${tone}`} style={{ width: `${Math.max(pct, used > 0 ? 1 : 0)}%` }} />
+      </span>
+      {pct >= 60 && (
+        <p className="text-xs text-slate-600">ใกล้เต็มแล้ว — เปิดงานเก่าแล้วกด &quot;ลบไฟล์ที่นักเรียนส่ง&quot; (คะแนนยังอยู่) หรือตั้งงานใหม่ให้ส่งเป็นลิงก์</p>
+      )}
+    </div>
   );
 }

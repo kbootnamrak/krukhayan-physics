@@ -4,26 +4,30 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { dbErrorMessage } from "@/lib/db-error";
 import {
+  ATTACH_BUCKET,
   BUCKET,
   dueCountdown,
   formatDue,
   formatWhen,
+  itemKey,
   lateText,
   newFilePath,
+  normalizeUrl,
   prepareFile,
   STATUS_DOT,
   STATUS_LABEL,
+  storedPaths,
   type Assignment,
   type StatusKey,
   type Submission,
   type SubmissionFile,
 } from "@/lib/assignments";
-import { FileGallery, FileTile, RemoveButton, useSignedUrls } from "./files";
+import { FileGallery, FileTile, LinkTile, RemoveButton, useSignedUrls } from "./files";
 
 type Draft = { id: string; file: File; preview: string | null };
 
 /**
- * หน้างานของนักเรียน: อ่านคำชี้แจง → ถ่ายรูป/แนบไฟล์ → ส่ง
+ * หน้างานของนักเรียน: อ่านคำชี้แจง → ถ่ายรูป/แนบไฟล์ หรือวางลิงก์ (ตามที่ครูตั้ง) → ส่ง
  * ส่งแล้วแก้ไขได้จนกว่าครูจะตรวจ · ครูส่งคืนให้แก้ → ส่งรอบใหม่
  */
 export default function StudentAssignment({
@@ -49,6 +53,11 @@ export default function StudentAssignment({
   const [done, setDone] = useState(false);
   const cameraRef = useRef<HTMLInputElement>(null);
   const pickRef = useRef<HTMLInputElement>(null);
+  const [linkText, setLinkText] = useState("");
+  // ครูเลือกต่องาน: ลิงก์อย่างเดียวไม่กินพื้นที่เก็บไฟล์ · ไฟล์ของงานที่ครูลบไปแล้วอัปโหลดเพิ่มไม่ได้
+  const acceptFiles = assignment.submit_mode !== "links" && !assignment.files_purged_at;
+  const acceptLinks = assignment.submit_mode !== "files";
+  const purged = !!assignment.files_purged_at;
 
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -59,7 +68,9 @@ export default function StudentAssignment({
 
   useEffect(() => () => drafts.forEach((d) => d.preview && URL.revokeObjectURL(d.preview)), [drafts]);
 
-  const keptUrls = useSignedUrls(kept.map((f) => f.path));
+  const keptUrls = useSignedUrls(storedPaths(kept));
+  const keptFiles = kept.filter((f) => f.path);
+  const keptLinks = kept.filter((f) => f.url);
   const total = kept.length + drafts.length;
   const room = assignment.max_files - total;
 
@@ -76,8 +87,18 @@ export default function StudentAssignment({
     setDrafts((d) => [...d, ...add]);
   }
 
+  function addLink() {
+    const url = normalizeUrl(linkText);
+    if (!url) return setError("ลิงก์ไม่ถูกต้อง — คัดลอกลิงก์ทั้งหมดมาวาง เช่น https://drive.google.com/...");
+    if (room <= 0) return setError(`แนบได้สูงสุด ${assignment.max_files} รายการ`);
+    if (kept.some((f) => f.url === url)) return setError("ใส่ลิงก์นี้ไปแล้ว");
+    setError(null);
+    setKept((k) => [...k, { url, name: url }]);
+    setLinkText("");
+  }
+
   async function submit() {
-    if (!total) return setError("ถ่ายรูปหรือแนบไฟล์งานอย่างน้อย 1 ไฟล์");
+    if (!total) return setError(acceptFiles ? "แนบรูป ไฟล์ หรือลิงก์งานอย่างน้อย 1 รายการ" : "วางลิงก์งานอย่างน้อย 1 ลิงก์");
     setError(null);
     const uploaded: SubmissionFile[] = [];
     try {
@@ -95,7 +116,8 @@ export default function StudentAssignment({
       const { data, error: e } = await supabase.rpc("assignment_submit", { p_assignment: assignment.id, p_files: files, p_note: note });
       if (e) throw new Error(dbErrorMessage(e));
       // ไฟล์รอบเดิมที่ถูกเอาออก (ยังไม่ถูกตรวจ) ลบทิ้งจากที่เก็บ
-      const removed = status === "submitted" ? (sub?.files ?? []).filter((f) => !files.some((x) => x.path === f.path)).map((f) => f.path) : [];
+      const nowPaths = storedPaths(files);
+      const removed = status === "submitted" ? storedPaths(sub?.files ?? []).filter((p) => !nowPaths.includes(p)) : [];
       if (removed.length) await supabase.storage.from(BUCKET).remove(removed);
       const next = data as Submission;
       setSub(next);
@@ -105,7 +127,7 @@ export default function StudentAssignment({
       setDone(true);
     } catch (err) {
       // อัปโหลดไปแล้วแต่ส่งไม่สำเร็จ → ลบไฟล์ที่ค้าง
-      if (uploaded.length) await supabase.storage.from(BUCKET).remove(uploaded.map((f) => f.path));
+      if (uploaded.length) await supabase.storage.from(BUCKET).remove(storedPaths(uploaded));
       setError(err instanceof Error ? err.message : "ส่งงานไม่สำเร็จ ลองใหม่");
     } finally {
       setBusy(null);
@@ -136,6 +158,12 @@ export default function StudentAssignment({
           </p>
         )}
         {assignment.instructions && <p className="whitespace-pre-wrap leading-relaxed text-slate-700">{assignment.instructions}</p>}
+        {assignment.attachments.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium text-slate-700">ไฟล์งานจากครู</p>
+            <FileGallery files={assignment.attachments} bucket={ATTACH_BUCKET} />
+          </div>
+        )}
       </section>
 
       {/* ---------- สถานะ / ผลตรวจ ---------- */}
@@ -162,11 +190,11 @@ export default function StudentAssignment({
             <p className="whitespace-pre-wrap text-slate-800">{sub.feedback}</p>
           </div>
         )}
-        {status === "returned" && <p className="text-sm text-slate-700">ครูส่งงานคืนให้แก้ — แก้ตามความเห็นแล้วถ่ายรูปส่งใหม่ด้านล่าง</p>}
+        {status === "returned" && <p className="text-sm text-slate-700">ครูส่งงานคืนให้แก้ — แก้ตามความเห็นแล้วส่งใหม่ด้านล่าง</p>}
         {status === "missing" && <p className="text-sm text-slate-700">ครูบันทึกว่ายังไม่ส่ง (0 คะแนน) — ยังส่งได้ ครูจะตรวจและให้คะแนนใหม่</p>}
 
         {/* ไฟล์ที่ส่งแล้ว (โหมดดู) */}
-        {!editing && sub && sub.files.length > 0 && <FileGallery files={sub.files} />}
+        {!editing && sub && sub.files.length > 0 && <FileGallery files={sub.files} purged={purged} />}
         {!editing && editable && sub && (
           <button
             type="button"
@@ -176,7 +204,7 @@ export default function StudentAssignment({
             }}
             className="min-h-11 rounded-sm border-2 border-porcelain px-4 text-sm font-semibold text-slate-800 hover:bg-slate-100"
           >
-            {status === "submitted" ? "แก้ไข/เพิ่มรูปแล้วส่งใหม่" : "ส่งงาน"}
+            {status === "submitted" ? "แก้ไขแล้วส่งใหม่" : "ส่งงาน"}
           </button>
         )}
       </section>
@@ -186,11 +214,22 @@ export default function StudentAssignment({
         <section className="space-y-4 rounded-sm border-2 border-slate-200 bg-white p-4 sm:p-5">
           <h2 className="font-display text-lg font-semibold text-slate-800">{status === "returned" ? "ส่งงานที่แก้แล้ว" : "แนบงาน"}</h2>
 
-          {total > 0 && (
+          {keptLinks.length > 0 && (
+            <ul className="space-y-2">
+              {keptLinks.map((f) => (
+                <li key={itemKey(f)} className="relative">
+                  <LinkTile url={f.url!} />
+                  <RemoveButton onClick={() => setKept((k) => k.filter((x) => x.url !== f.url))} label={`เอาลิงก์ ${f.url} ออก`} />
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {keptFiles.length + drafts.length > 0 && (
             <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-              {kept.map((f, i) => (
-                <li key={f.path} className="relative">
-                  <FileTile file={f} url={keptUrls[f.path]} index={i} />
+              {keptFiles.map((f, i) => (
+                <li key={itemKey(f)} className="relative">
+                  <FileTile file={f} url={keptUrls[f.path!]} index={i} />
                   <RemoveButton onClick={() => setKept((k) => k.filter((x) => x.path !== f.path))} label={`เอา ${f.name} ออก`} />
                 </li>
               ))}
@@ -208,36 +247,80 @@ export default function StudentAssignment({
             </ul>
           )}
 
-          <div className="grid gap-2 sm:grid-cols-2">
-            <button
-              type="button"
-              disabled={room <= 0 || !!busy}
-              onClick={() => cameraRef.current?.click()}
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-sm border-2 border-trace-cyan px-4 font-semibold text-slate-800 hover:bg-[color-mix(in_oklch,var(--trace-cyan)_12%,transparent)] disabled:opacity-40"
-            >
-              <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden>
-                <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
-                <circle cx="12" cy="13" r="3.5" />
-              </svg>
-              ถ่ายรูป
-            </button>
-            <button
-              type="button"
-              disabled={room <= 0 || !!busy}
-              onClick={() => pickRef.current?.click()}
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-sm border-2 border-slate-300 px-4 font-semibold text-slate-800 hover:bg-slate-100 disabled:opacity-40"
-            >
-              <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M12 16V4M7 9l5-5 5 5M4 16v4h16v-4" />
-              </svg>
-              เลือกรูป / PDF
-            </button>
-          </div>
-          <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => (addFiles(e.target.files), (e.target.value = ""))} />
-          <input ref={pickRef} type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={(e) => (addFiles(e.target.files), (e.target.value = ""))} />
-          <p className="text-xs text-slate-500">
-            แนบได้สูงสุด {assignment.max_files} ไฟล์ · ถ่ายให้เห็นทั้งหน้า แสงพอ อ่านออก · ระบบย่อรูปให้อัตโนมัติ
-          </p>
+          {acceptFiles && (
+            <>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                disabled={room <= 0 || !!busy}
+                onClick={() => cameraRef.current?.click()}
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-sm border-2 border-trace-cyan px-4 font-semibold text-slate-800 hover:bg-[color-mix(in_oklch,var(--trace-cyan)_12%,transparent)] disabled:opacity-40"
+              >
+                <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden>
+                  <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
+                  <circle cx="12" cy="13" r="3.5" />
+                </svg>
+                ถ่ายรูป
+              </button>
+              <button
+                type="button"
+                disabled={room <= 0 || !!busy}
+                onClick={() => pickRef.current?.click()}
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-sm border-2 border-slate-300 px-4 font-semibold text-slate-800 hover:bg-slate-100 disabled:opacity-40"
+              >
+                <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M12 16V4M7 9l5-5 5 5M4 16v4h16v-4" />
+                </svg>
+                เลือกรูป / PDF
+              </button>
+            </div>
+            <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => (addFiles(e.target.files), (e.target.value = ""))} />
+            <input ref={pickRef} type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={(e) => (addFiles(e.target.files), (e.target.value = ""))} />
+            <p className="text-xs text-slate-500">
+              แนบได้รวมสูงสุด {assignment.max_files} รายการ · ถ่ายให้เห็นทั้งหน้า แสงพอ อ่านออก · ระบบย่อรูปให้อัตโนมัติ
+            </p>
+            </>
+          )}
+
+          {acceptLinks && (
+            <div className="space-y-1.5">
+              <label htmlFor="sub-link" className="block text-sm font-medium text-slate-700">
+                {acceptFiles ? "หรือวางลิงก์งาน" : "ลิงก์งาน"}
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="sub-link"
+                  type="url"
+                  inputMode="url"
+                  enterKeyHint="done"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  value={linkText}
+                  disabled={room <= 0 || !!busy}
+                  onChange={(e) => setLinkText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addLink();
+                    }
+                  }}
+                  placeholder="https://drive.google.com/..."
+                  className="min-w-0 flex-1 rounded-sm border-2 border-slate-300 bg-white px-3 py-2 text-base text-slate-800 sm:text-sm"
+                />
+                <button
+                  type="button"
+                  disabled={!linkText.trim() || room <= 0 || !!busy}
+                  onClick={addLink}
+                  className="min-h-12 shrink-0 rounded-sm border-2 border-trace-cyan px-4 font-semibold text-slate-800 hover:bg-[color-mix(in_oklch,var(--trace-cyan)_12%,transparent)] disabled:opacity-40 sm:min-h-10"
+                >
+                  เพิ่มลิงก์
+                </button>
+              </div>
+              <p className="text-xs text-slate-500">
+                Google Drive / Docs / Canva ฯลฯ — ตั้งค่าแชร์เป็น &quot;ทุกคนที่มีลิงก์ดูได้&quot; ไม่งั้นครูเปิดไม่ได้
+              </p>
+            </div>
+          )}
 
           <div className="space-y-1">
             <label htmlFor="sub-note" className="block text-sm font-medium text-slate-700">
@@ -293,7 +376,7 @@ export default function StudentAssignment({
               </summary>
               <div className="mt-3 space-y-2">
                 {h.feedback && <p className="whitespace-pre-wrap text-sm text-slate-700">ครู: {h.feedback}</p>}
-                <FileGallery files={h.files} />
+                <FileGallery files={h.files} purged={purged} />
               </div>
             </details>
           ))}

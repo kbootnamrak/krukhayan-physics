@@ -14,10 +14,58 @@ export type Assignment = {
   rooms: string[] | null;
   published: boolean;
   max_files: number;
+  /** ไฟล์งาน/ใบงานที่ครูแนบ (bucket "assignment-files") หรือลิงก์ */
+  attachments: SubmissionFile[];
+  /** files = รูป/ไฟล์ · links = ลิงก์เท่านั้น (ไม่กินพื้นที่) · both = ได้ทั้งสองแบบ */
+  submit_mode: SubmitMode;
+  /** ครูลบไฟล์ของงานนี้ออกจากที่เก็บแล้ว (คะแนนยังอยู่) */
+  files_purged_at: string | null;
   created_at: string;
 };
 
-export type SubmissionFile = { path: string; name: string; size: number; type: string };
+export type SubmitMode = "files" | "links" | "both";
+
+export const SUBMIT_MODE_LABEL: Record<SubmitMode, string> = {
+  both: "รูป/ไฟล์ หรือลิงก์",
+  links: "ลิงก์เท่านั้น",
+  files: "รูป/ไฟล์เท่านั้น",
+};
+
+/** หนึ่งรายการที่ส่ง: ไฟล์ในที่เก็บ (path) หรือลิงก์ภายนอก (url) */
+export type SubmissionFile = { path?: string; url?: string; name: string; size?: number; type?: string };
+
+export const isLink = (f: SubmissionFile) => !!f.url;
+export const itemKey = (f: SubmissionFile) => f.path ?? f.url ?? f.name;
+export const storedPaths = (files: SubmissionFile[]) => files.map((f) => f.path).filter((p): p is string => !!p);
+
+/** เติม https:// ให้ถ้าไม่มี — คืน null ถ้าไม่ใช่ลิงก์ */
+export function normalizeUrl(text: string): string | null {
+  const t = text.trim();
+  if (!t || /\s/.test(t)) return null;
+  const withScheme = /^https?:\/\//i.test(t) ? t : `https://${t}`;
+  try {
+    const u = new URL(withScheme);
+    return u.hostname.includes(".") ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** ชื่อบริการจากลิงก์ เช่น Google Drive, Canva */
+export function linkLabel(url: string): string {
+  let host = "";
+  try {
+    host = new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "ลิงก์";
+  }
+  if (host === "drive.google.com") return "Google Drive";
+  if (host === "docs.google.com") return /\/spreadsheets\//.test(url) ? "Google Sheets" : /\/presentation\//.test(url) ? "Google Slides" : "Google Docs";
+  if (host.endsWith("canva.com")) return "Canva";
+  if (host === "youtu.be" || host.endsWith("youtube.com")) return "YouTube";
+  if (host.endsWith("onedrive.live.com") || host.endsWith("sharepoint.com") || host === "1drv.ms") return "OneDrive";
+  return host;
+}
 
 export type SubmissionStatus = "submitted" | "returned" | "graded" | "missing";
 
@@ -47,6 +95,26 @@ export type Submission = {
 };
 
 export const BUCKET = "submissions";
+/** ไฟล์ที่ครูแนบให้นักเรียน */
+export const ATTACH_BUCKET = "assignment-files";
+export const MAX_ATTACH_BYTES = 20 * 1024 * 1024;
+/** พื้นที่เก็บไฟล์ของ Supabase แผนฟรี (รวมทุก bucket ไม่ใช่รายเดือน) */
+export const STORAGE_QUOTA_BYTES = 1024 * 1024 * 1024;
+
+export const ATTACH_ACCEPT =
+  "application/pdf,image/*,.doc,.docx,.ppt,.pptx,.xls,.xlsx";
+
+/** ไฟล์ที่ครูแนบ: รูปย่อเหมือนงานนักเรียน เอกสารอื่นส่งตามเดิม (ไม่เกิน 20 MB) */
+export async function prepareAttachment(file: File): Promise<PreparedFile> {
+  if (file.type.startsWith("image/")) return prepareFile(file);
+  if (file.size > MAX_ATTACH_BYTES) throw new Error(`ไฟล์ ${file.name} ใหญ่เกิน 20 MB — อัปโหลดขึ้น Google Drive แล้วแนบเป็นลิงก์แทน`);
+  const ext = (file.name.match(/\.([a-z0-9]+)$/i)?.[1] ?? "bin").toLowerCase();
+  return { blob: file, name: file.name, type: file.type || "application/octet-stream", ext };
+}
+
+export function attachmentPath(assignmentId: string, ext: string): string {
+  return `${assignmentId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+}
 
 /** ช่องคะแนนที่ผูกได้ — แสดงเป็น "หน่วยที่ 1 … · P (10)" */
 export type ComponentOption = { id: string; label: string };

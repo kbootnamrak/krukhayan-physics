@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { BUCKET, formatBytes, type SubmissionFile } from "@/lib/assignments";
+import { BUCKET, formatBytes, itemKey, linkLabel, storedPaths, type SubmissionFile } from "@/lib/assignments";
 
 /** ลิงก์ชั่วคราว (1 ชม.) ของไฟล์ในที่เก็บส่วนตัว — ขอครั้งเดียวต่อชุดไฟล์ */
-export function useSignedUrls(paths: string[]): Record<string, string> {
+export function useSignedUrls(paths: string[], bucket: string = BUCKET): Record<string, string> {
   const supabase = useMemo(() => createClient(), []);
   const key = paths.join("|");
   const [urls, setUrls] = useState<Record<string, string>>({});
@@ -14,7 +14,7 @@ export function useSignedUrls(paths: string[]): Record<string, string> {
     if (!list.length) return;
     let alive = true;
     supabase.storage
-      .from(BUCKET)
+      .from(bucket)
       .createSignedUrls(list, 3600)
       .then(({ data }) => {
         if (!alive || !data) return;
@@ -25,7 +25,7 @@ export function useSignedUrls(paths: string[]): Record<string, string> {
     return () => {
       alive = false;
     };
-  }, [key, supabase]);
+  }, [bucket, key, supabase]);
   return urls;
 }
 
@@ -33,33 +33,82 @@ export function useSignedUrls(paths: string[]): Record<string, string> {
  * แสดงไฟล์งาน
  * - large = รูปเต็มความกว้างเรียงลงมา (ครูตรวจ อ่านลายมือได้)
  * - ปกติ = ตารางรูปย่อ แตะเพื่อเปิดรูปเต็ม
+ * - ลิงก์ (Google Drive ฯลฯ) แสดงเป็นแถบลิงก์เต็มความกว้าง เปิดในแท็บใหม่
+ * - purged = ครูลบไฟล์ของงานนี้แล้ว (ลิงก์ยังเปิดได้ตามปกติ)
  */
 export function FileGallery({
   files,
   large = false,
+  purged = false,
+  bucket = BUCKET,
   onRemove,
 }: {
   files: SubmissionFile[];
   large?: boolean;
-  onRemove?: (path: string) => void;
+  purged?: boolean;
+  bucket?: string;
+  onRemove?: (key: string) => void;
 }) {
-  const urls = useSignedUrls(files.map((f) => f.path));
+  const stored = files.filter((f) => f.path);
+  const links = files.filter((f) => f.url);
+  const urls = useSignedUrls(purged ? [] : storedPaths(stored), bucket);
   if (!files.length) return null;
   return (
-    <ul className={large ? "space-y-3" : "grid grid-cols-3 gap-2 sm:grid-cols-4"}>
-      {files.map((f, i) => (
-        <li key={f.path} className="relative">
-          <FileTile file={f} url={urls[f.path]} index={i} large={large} />
-          {onRemove && <RemoveButton onClick={() => onRemove(f.path)} label={`เอา ${f.name} ออก`} />}
-        </li>
-      ))}
-    </ul>
+    <div className="space-y-2">
+      {links.length > 0 && (
+        <ul className="space-y-2">
+          {links.map((f) => (
+            <li key={itemKey(f)} className="relative">
+              <LinkTile url={f.url!} />
+              {onRemove && <RemoveButton onClick={() => onRemove(itemKey(f))} label={`เอาลิงก์ ${f.url} ออก`} />}
+            </li>
+          ))}
+        </ul>
+      )}
+      {stored.length > 0 &&
+        (purged ? (
+          <p className="rounded-sm border-2 border-dashed border-slate-200 px-3 py-2 text-sm text-slate-500">
+            รูป/ไฟล์ {stored.length} รายการ ถูกลบออกจากที่เก็บแล้ว (คะแนนยังอยู่)
+          </p>
+        ) : (
+          <ul className={large ? "space-y-3" : "grid grid-cols-3 gap-2 sm:grid-cols-4"}>
+            {stored.map((f, i) => (
+              <li key={itemKey(f)} className="relative">
+                <FileTile file={f} url={urls[f.path!]} index={i} large={large} />
+                {onRemove && <RemoveButton onClick={() => onRemove(itemKey(f))} label={`เอา ${f.name} ออก`} />}
+              </li>
+            ))}
+          </ul>
+        ))}
+    </div>
   );
 }
 
-export function FileTile({ file, url, index, large }: { file: { name: string; type: string; size?: number }; url: string | undefined; index: number; large?: boolean }) {
-  const isPdf = file.type === "application/pdf";
-  if (isPdf) {
+/** ลิงก์งานภายนอก — แสดงชื่อบริการ + ที่อยู่ย่อ */
+export function LinkTile({ url }: { url: string }) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer noopener"
+      className="flex min-h-12 items-center gap-3 rounded-sm border-2 border-slate-200 bg-white py-2 pl-3 pr-11 hover:border-slate-400"
+    >
+      <svg viewBox="0 0 24 24" className="size-5 shrink-0 text-trace-cyan" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" />
+        <path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
+      </svg>
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold text-slate-800">{linkLabel(url)}</span>
+        <span className="block truncate text-xs text-slate-500">{url}</span>
+      </span>
+    </a>
+  );
+}
+
+export function FileTile({ file, url, index, large }: { file: { name: string; type?: string; size?: number }; url: string | undefined; index: number; large?: boolean }) {
+  // รูปแสดงเป็นภาพ · อย่างอื่น (PDF, Word, PowerPoint ...) แสดงเป็นไอคอนเอกสาร
+  if (!file.type?.startsWith("image/")) {
+    const ext = (file.name.match(/\.([a-z0-9]+)$/i)?.[1] ?? "ไฟล์").toUpperCase();
     return (
       <a
         href={url}
@@ -72,7 +121,7 @@ export function FileTile({ file, url, index, large }: { file: { name: string; ty
           <path d="M14 3v5h5" />
         </svg>
         <span className="line-clamp-2 break-all text-xs text-slate-700">{file.name}</span>
-        {file.size ? <span className="text-[11px] text-slate-500">PDF · {formatBytes(file.size)}</span> : null}
+        {file.size ? <span className="text-[11px] text-slate-500">{ext} · {formatBytes(file.size)}</span> : null}
       </a>
     );
   }
