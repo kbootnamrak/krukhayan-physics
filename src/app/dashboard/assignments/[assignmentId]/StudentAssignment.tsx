@@ -11,8 +11,10 @@ import {
   formatWhen,
   itemKey,
   lateText,
+  MAX_PDF_BYTES,
   newFilePath,
   normalizeUrl,
+  pdfTooBigMessage,
   prepareFile,
   STATUS_DOT,
   STATUS_LABEL,
@@ -77,7 +79,10 @@ export default function StudentAssignment({
   function addFiles(list: FileList | null) {
     if (!list?.length) return;
     setError(null);
-    const files = [...list];
+    // PDF ใหญ่เกินกำหนด บอกทันทีตอนเลือก ไม่ต้องรอกดส่ง
+    const tooBig = [...list].filter((f) => f.type === "application/pdf" && f.size > MAX_PDF_BYTES);
+    const files = [...list].filter((f) => !tooBig.includes(f));
+    if (tooBig.length) setError(pdfTooBigMessage(tooBig.map((f) => f.name).join(", ")));
     if (files.length > room) setError(`แนบได้อีก ${Math.max(0, room)} ไฟล์ (สูงสุด ${assignment.max_files} ไฟล์)`);
     const add = files.slice(0, Math.max(0, room)).map((file) => ({
       id: `${file.name}-${file.size}-${Math.random()}`,
@@ -277,7 +282,7 @@ export default function StudentAssignment({
             <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => (addFiles(e.target.files), (e.target.value = ""))} />
             <input ref={pickRef} type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={(e) => (addFiles(e.target.files), (e.target.value = ""))} />
             <p className="text-xs text-slate-500">
-              แนบได้รวมสูงสุด {assignment.max_files} รายการ · ถ่ายให้เห็นทั้งหน้า แสงพอ อ่านออก · ระบบย่อรูปให้อัตโนมัติ
+              แนบได้รวมสูงสุด {assignment.max_files} รายการ · PDF ไม่เกิน 3 MB · ถ่ายให้เห็นทั้งหน้า แสงพอ อ่านออก · ระบบย่อรูปให้อัตโนมัติ
             </p>
             </>
           )}
