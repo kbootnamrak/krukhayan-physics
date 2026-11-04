@@ -202,12 +202,15 @@ export const STATUS_DOT: Record<StatusKey, string> = {
 };
 
 // ---------------------------------------------------------------------------
-// เตรียมไฟล์: ย่อรูปจากกล้องมือถือ (หลาย MB) ให้เหลือราว 200–400 KB
+// เตรียมไฟล์: ย่อรูปจากกล้องมือถือ (หลาย MB) ให้เหลือราว 150–250 KB (ด้านยาว 1280 px ยังอ่านลายมือออก)
 // พื้นที่เก็บไฟล์ฟรีมี 1 GB ต่อทั้งระบบ — รูปเต็มขนาดจะเต็มภายในเทอมเดียว
 // ---------------------------------------------------------------------------
-const MAX_SIDE = 1600;
-const JPEG_QUALITY = 0.78;
-export const MAX_PDF_BYTES = 8 * 1024 * 1024;
+const MAX_SIDE = 1280;
+const JPEG_QUALITY = 0.75;
+/** PDF ที่นักเรียนอัปโหลด — ใหญ่กว่านี้ให้ส่งเป็นลิงก์ (PDF เคยกินพื้นที่ 1/3 ทั้งที่มีแค่ 6% ของไฟล์) */
+export const MAX_PDF_BYTES = 3 * 1024 * 1024;
+export const pdfTooBigMessage = (name: string) =>
+  `ไฟล์ ${name} ใหญ่เกิน 3 MB — อัปขึ้น Google Drive แล้วส่งเป็นลิงก์แทน หรือถ่ายเป็นรูปส่งแทน`;
 
 export type PreparedFile = { blob: Blob; name: string; type: string; ext: string };
 
@@ -229,7 +232,7 @@ async function decode(file: File): Promise<ImageBitmap | HTMLImageElement> {
 
 export async function prepareFile(file: File): Promise<PreparedFile> {
   if (file.type === "application/pdf") {
-    if (file.size > MAX_PDF_BYTES) throw new Error(`ไฟล์ ${file.name} ใหญ่เกิน 8 MB`);
+    if (file.size > MAX_PDF_BYTES) throw new Error(pdfTooBigMessage(file.name));
     return { blob: file, name: file.name, type: file.type, ext: "pdf" };
   }
   if (!file.type.startsWith("image/") && !/\.(heic|heif)$/i.test(file.name)) {
