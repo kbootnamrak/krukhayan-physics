@@ -262,7 +262,7 @@ export default function TeacherAssignment({
         <div className="flex flex-wrap items-center gap-3 rounded-sm border-2 border-slate-200 bg-white p-3 text-sm">
           <span className="min-w-0 flex-1 text-slate-700">
             เลยกำหนดส่งแล้ว ยังไม่ส่ง <b className="text-slate-800">{noneIds.length} คน</b>
-            {comp && " — ถ้าไม่ให้ 0 ช่องคะแนนของคนเหล่านี้จะคิดจากงานที่ตรวจแล้วเท่านั้น"}
+            {comp && " — คนที่ไม่ส่งไม่ได้คะแนนงานนี้ในช่องอยู่แล้ว กดเพื่อบันทึกสถานะว่าไม่ส่ง"}
           </span>
           <SmallButton onClick={zeroMissing} disabled={busy}>
             ให้ 0 คนที่ไม่ส่ง
