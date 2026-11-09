@@ -279,6 +279,12 @@ export function QuestionPanel({
             <p className={`font-display text-xl font-bold ${feedback!.ok ? "text-green-700" : "text-red-700"}`}>
               {feedback!.ok ? `ถูกต้อง! +${Number(feedback!.pts)} คะแนน` : "ยังไม่ถูก"}
             </p>
+            {/* ยังเหลือสิทธิ์เล่น: ไม่บอกเฉลย ให้ลองคิดใหม่ครั้งหน้า */}
+            {!correctText && !feedback!.explanation && (
+              <p className="text-sm text-slate-600">
+                {feedback!.ok ? "เก่งมาก ไปต่อเลย" : "จำข้อนี้ไว้ เฉลยและคำอธิบายจะเปิดเมื่อเล่นครบทุกครั้ง"}
+              </p>
+            )}
             {!feedback!.ok && givenText && (
               <p className="text-sm text-slate-600">
                 คุณตอบ: <QuizText text={givenText} />

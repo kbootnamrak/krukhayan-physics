@@ -28,6 +28,7 @@ export type Game = {
   /** รูปแบบการเล่น: runner (วิ่งข้ามด่าน) · battle (บอสแบทเทิล) */
   mode: string;
   created_at: string;
+  max_attempts: number;
 };
 
 export type GameItem = {
@@ -42,7 +43,9 @@ export type GameItem = {
   points: number;
 };
 
-/** ผลของข้อที่ตอบแล้ว — ได้จากเซิร์ฟเวอร์ รวมเฉลยและคำอธิบายของข้อนั้น */
+/** ผลของข้อที่ตอบแล้ว — ได้จากเซิร์ฟเวอร์
+ * เฉลย (correct_index / answer) และคำอธิบายเป็น null จนกว่าจะเล่นครบทุกครั้งหรือกดจบเอง
+ * given / correct_index เป็นตำแหน่งตามลำดับตัวเลือกที่เห็นในครั้งนั้น (สลับทุกครั้ง) */
 export type GameFeedback = {
   item_id: string;
   given: number | null;
@@ -67,6 +70,16 @@ export type GamePayload = {
   xp: number;
   items: GameItem[];
   feedback: Record<string, GameFeedback>;
+  /** ครั้งที่เท่าไร / เล่นได้กี่ครั้ง / เล่นไปแล้วกี่ครั้ง (รวมครั้งนี้) */
+  attempt: number;
+  max_attempts: number;
+  attempts_used: number;
+  /** คะแนนดีที่สุดจากครั้งที่เล่นจบแล้ว — คะแนนที่เก็บ */
+  best_score: number | null;
+  /** เปิดเฉลยแล้ว (เล่นครบ หรือกดจบ) */
+  revealed: boolean;
+  /** เล่นครั้งใหม่ได้ */
+  can_retry: boolean;
 };
 
 export type GamePlay = {
@@ -79,25 +92,54 @@ export type GamePlay = {
   score: number;
   max_score: number;
   xp: number;
+  attempt: number;
+  final: boolean;
 };
+
+/** สรุปการเล่นของนักเรียนแต่ละคน: ครั้งที่ได้คะแนนดีที่สุด (เล่นจบ) + ครั้งล่าสุด + จำนวนครั้ง */
+export type PlaySummary = { best: GamePlay | null; latest: GamePlay; attempts: number };
+
+export function summarizePlays(plays: GamePlay[]): Map<string, PlaySummary> {
+  const out = new Map<string, PlaySummary>();
+  for (const p of plays) {
+    const cur = out.get(p.enrollment_id);
+    if (!cur) {
+      out.set(p.enrollment_id, { best: p.finished_at ? p : null, latest: p, attempts: 1 });
+      continue;
+    }
+    cur.attempts++;
+    if (p.attempt > cur.latest.attempt) cur.latest = p;
+    if (p.finished_at && (!cur.best || Number(p.score) > Number(cur.best.score) || (Number(p.score) === Number(cur.best.score) && p.attempt < cur.best.attempt))) {
+      cur.best = p;
+    }
+  }
+  return out;
+}
 
 export type GameSession = { id: string; game_id: string; classroom: string; opened_at: string; closed_at: string | null };
 
+/** สรุปเกมของฉัน — ข้อมูลครั้งล่าสุด + คะแนนดีที่สุด + จำนวนครั้ง */
 export type MyGamePlay = {
   game_id: string;
   play_id: string;
   started_at: string;
   finished_at: string | null;
   score: number;
+  best_score: number | null;
   max_score: number;
   xp: number;
   answered: number;
+  attempts_used: number;
+  max_attempts: number;
+  revealed: boolean;
 };
 
 export function gameErrorMessage(message: string | undefined | null): string {
   const m = message ?? "";
   if (m.includes("not_open")) return "ครูยังไม่เปิดเกมนี้ให้ห้องของคุณ";
   if (m.includes("already_finished")) return "คุณเล่นเกมนี้จบแล้ว";
+  if (m.includes("no_attempts_left")) return "ใช้สิทธิ์เล่นครบแล้ว";
+  if (m.includes("not_finished")) return "เล่นครั้งนี้ให้จบก่อน";
   if (m.includes("not_enrolled")) return "คุณยังไม่ได้ลงทะเบียนในวิชานี้ ถ้าคิดว่าผิดพลาด แจ้งครูผู้สอน";
   if (m.includes("no_items")) return "เกมนี้ยังไม่มีคำถาม";
   if (m.includes("game_not_found")) return "ไม่พบเกมนี้";

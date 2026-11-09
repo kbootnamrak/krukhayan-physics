@@ -8,7 +8,7 @@ import { downloadBlob } from "@/lib/download";
 import { compareRoster } from "@/lib/students/order";
 import { unitTrace } from "@/lib/traces";
 import QuizText from "@/components/QuizText";
-import { CHOICE_LETTERS, formatNumber, type Game, type GameItem, type GamePlay, type GameSession } from "@/lib/game";
+import { CHOICE_LETTERS, formatNumber, type Game, type GameItem, type GamePlay, type GameSession, summarizePlays } from "@/lib/game";
 import Breadcrumbs from "../../Breadcrumbs";
 import { FarLayer, THEMES, ThemedEnemy, themeOf, type ThemeId } from "./play/themes";
 
@@ -93,11 +93,12 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
 
   const maxScore = items.reduce((s, x) => s + Number(x.points), 0);
   const openCount = sessions.filter((s) => !s.closed_at).length;
-  const finished = plays.filter((p) => p.finished_at).length;
+  const summary = summarizePlays(plays);
+  const finished = [...summary.values()].filter((x) => x.best).length;
   const tabs: { key: Tab; label: string; badge?: string }[] = [
     { key: "items", label: "คำถามและเฉลย", badge: `${items.length} ข้อ` },
     { key: "sessions", label: "เปิดให้เล่น", badge: openCount ? `เปิด ${openCount} ห้อง` : undefined },
-    { key: "results", label: "ผลการเล่น", badge: plays.length ? `เล่นแล้ว ${plays.length}` : undefined },
+    { key: "results", label: "ผลการเล่น", badge: summary.size ? `เล่นแล้ว ${summary.size} คน` : undefined },
   ];
 
   return (
@@ -113,7 +114,7 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
           />
           <h1 className="font-display text-3xl font-bold text-slate-800">{game.title}</h1>
           <p className="text-sm text-slate-500">
-            {[`${game.stages.length} ด่าน`, `${items.length} ข้อ`, `คะแนนเต็ม ${maxScore}`, "ตอบแล้วรู้ผลทันที นับคำตอบแรก", `เล่นจบแล้ว ${finished} คน`].join(" · ")}
+            {[`${game.stages.length} ด่าน`, `${items.length} ข้อ`, `คะแนนเต็ม ${maxScore}`, `เล่นได้ ${game.max_attempts ?? 3} ครั้ง เก็บคะแนนดีที่สุด`, `เล่นจบแล้ว ${finished} คน`].join(" · ")}
           </p>
         </div>
 
@@ -127,6 +128,7 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
           <ModePicker gameId={game.id} value={game.mode === "battle" ? "battle" : "runner"} onChanged={load} />
           <ThemePicker gameId={game.id} value={themeOf(game.theme)} onChanged={load} />
         </div>
+        <AttemptsPicker gameId={game.id} value={game.max_attempts ?? 3} onChanged={load} />
 
         <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-slate-200" style={{ "--neon": "var(--trace-magenta)" } as React.CSSProperties}>
           {tabs.map((t) => (
@@ -257,8 +259,8 @@ function SessionsView({
           const open = sessions.find((s) => s.classroom === room && !s.closed_at);
           const inRoom = enrollments.filter((e) => e.class_roster?.classroom === room);
           const ids = new Set(inRoom.map((e) => e.id));
-          const started = plays.filter((p) => ids.has(p.enrollment_id));
-          const done = started.filter((p) => p.finished_at).length;
+          const started = [...summarizePlays(plays.filter((p) => ids.has(p.enrollment_id))).values()];
+          const done = started.filter((x) => x.best).length;
           return (
             <li key={room} className="flex flex-wrap items-center gap-3 p-4">
               <span className="min-w-0 flex-1">
@@ -321,6 +323,7 @@ function ResultsView({
   const rooms = [...new Set(enrollments.map((e) => e.class_roster?.classroom).filter((r): r is string => !!r))].sort(th.compare);
   const maxScore = items.reduce((s, x) => s + Number(x.points), 0);
 
+  const summary = summarizePlays(plays);
   const rows = enrollments
     .map((e) => ({
       id: e.id,
@@ -328,11 +331,15 @@ function ResultsView({
       student_code: e.class_roster?.student_code ?? null,
       classroom: e.class_roster?.classroom ?? null,
       class_number: e.class_roster?.class_number ?? null,
-      play: plays.find((p) => p.enrollment_id === e.id) ?? null,
+      // คะแนนที่เก็บ = ครั้งที่ดีที่สุดที่เล่นจบ · ยังไม่จบสักครั้ง = ครั้งที่กำลังเล่น
+      play: summary.get(e.id)?.best ?? summary.get(e.id)?.latest ?? null,
+      latest: summary.get(e.id)?.latest ?? null,
+      attempts: summary.get(e.id)?.attempts ?? 0,
     }))
     .filter((r) => !room || r.classroom === room)
     .sort(compareRoster);
   const done = rows.filter((r) => r.play?.finished_at);
+  const maxAttempts = game.max_attempts ?? 3;
   const avg = done.length ? done.reduce((s, r) => s + Number(r.play!.score), 0) / done.length : null;
 
   function minutesUsed(p: GamePlay) {
@@ -342,8 +349,14 @@ function ResultsView({
     return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
   }
 
+  function statusText(r: { play: GamePlay | null; latest: GamePlay | null; attempts: number }) {
+    if (!r.latest) return "ยังไม่เล่น";
+    if (!r.latest.finished_at) return `กำลังเล่นครั้งที่ ${r.latest.attempt} (${Object.keys(r.latest.answers ?? {}).length}/${items.length})`;
+    return `เล่น ${r.attempts}/${maxAttempts} ครั้ง${r.latest.final || r.attempts >= maxAttempts ? " · จบแล้ว" : ""}`;
+  }
+
   async function reset(enrollmentId: string, name: string) {
-    if (!window.confirm(`ให้ ${name} เล่นเกมนี้ใหม่?\nคำตอบและคะแนนเดิมจะถูกลบ`)) return;
+    if (!window.confirm(`ให้ ${name} เริ่มเกมนี้ใหม่ทั้งหมด?\nคำตอบและคะแนนทุกครั้งจะถูกลบ ได้สิทธิ์เล่นครบ ${maxAttempts} ครั้งอีกรอบ`)) return;
     setBusy(true);
     const { error: e } = await supabase.from("game_plays").delete().eq("game_id", game.id).eq("enrollment_id", enrollmentId);
     setBusy(false);
@@ -354,14 +367,15 @@ function ResultsView({
 
   async function exportExcel() {
     const XLSX = await import("xlsx");
-    const header = ["ห้อง", "เลขที่", "รหัสนักเรียน", "ชื่อ-สกุล", `คะแนน (เต็ม ${maxScore})`, "สถานะ", "XP", "เวลาที่ใช้", ...items.map((_, i) => `ข้อ ${i + 1}`)];
+    const header = ["ห้อง", "เลขที่", "รหัสนักเรียน", "ชื่อ-สกุล", `คะแนนดีที่สุด (เต็ม ${maxScore})`, "เล่นไป (ครั้ง)", "สถานะ", "XP", "เวลาที่ใช้", ...items.map((_, i) => `ข้อ ${i + 1}`)];
     const body = rows.map((r) => [
       r.classroom ?? "",
       r.class_number ?? "",
       r.student_code ?? "",
       r.full_name,
-      r.play ? Number(r.play.score) : "",
-      !r.play ? "ยังไม่เล่น" : r.play.finished_at ? "เล่นจบ" : "เล่นค้าง",
+      r.play?.finished_at ? Number(r.play.score) : "",
+      r.attempts || "",
+      statusText(r),
       r.play ? r.play.xp : "",
       r.play ? minutesUsed(r.play) ?? "" : "",
       ...items.map((it) => {
@@ -442,8 +456,8 @@ function ResultsView({
                         </span>
                       </button>
                     </td>
-                    <td className={`p-2 ${!p ? "text-slate-400" : p.finished_at ? "text-green-700" : "text-amber-700"}`}>
-                      {!p ? "ยังไม่เล่น" : p.finished_at ? "เล่นจบ" : `เล่นค้าง (${Object.keys(p.answers ?? {}).length}/${items.length})`}
+                    <td className={`p-2 ${!p ? "text-slate-400" : r.latest && !r.latest.finished_at ? "text-amber-700" : "text-green-700"}`}>
+                      {statusText(r)}
                     </td>
                     <td className="p-2 text-right font-num tnum text-trace-cyan">{p ? p.xp.toLocaleString() : "–"}</td>
                     <td className="p-2 text-right font-num tnum text-slate-600">{p ? minutesUsed(p) ?? "–" : "–"}</td>
@@ -452,6 +466,7 @@ function ResultsView({
                         <>
                           <span className="text-lg font-semibold text-slate-800">{Number(p.score)}</span>
                           <span className="text-slate-500"> / {Number(p.max_score)}</span>
+                          {r.attempts > 1 && p.finished_at && <span className="block text-xs text-slate-500">ดีที่สุด (ครั้งที่ {p.attempt})</span>}
                         </>
                       ) : (
                         <span className="text-slate-400">–</span>
@@ -460,7 +475,7 @@ function ResultsView({
                     <td className="p-2 text-right">
                       {p && (
                         <button type="button" disabled={busy} onClick={() => reset(r.id, r.full_name)} className="text-xs text-slate-500 hover:text-red-700 hover:underline">
-                          ให้เล่นใหม่
+                          เริ่มใหม่ทั้งหมด
                         </button>
                       )}
                     </td>
@@ -503,6 +518,45 @@ function ResultsView({
 
 // ---------------------------------------------------------------------------
 /** ธีมของเกม — เปลี่ยนได้ตลอด คนที่กำลังเล่นอยู่จะเห็นธีมใหม่เมื่อเปิดหน้าเกมอีกครั้ง */
+/** จำนวนครั้งที่นักเรียนเล่นได้ — เก็บคะแนนครั้งที่ดีที่สุด เฉลยเปิดหลังเล่นครบ */
+function AttemptsPicker({ gameId, value, onChanged }: { gameId: string; value: number; onChanged: () => void }) {
+  const supabase = createClient();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function pick(n: number) {
+    if (n === value) return;
+    setBusy(true);
+    const { error: e } = await supabase.from("games").update({ max_attempts: n }).eq("id", gameId);
+    setBusy(false);
+    if (e) return setError(dbErrorMessage(e));
+    setError(null);
+    onChanged();
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-sm border-2 border-slate-200 bg-white px-4 py-3">
+      <span className="font-display font-semibold text-slate-800">เล่นได้</span>
+      <div role="group" aria-label="จำนวนครั้งที่เล่นได้" className="flex gap-1.5">
+        {[1, 2, 3, 5].map((n) => (
+          <button
+            key={n}
+            type="button"
+            aria-pressed={value === n}
+            disabled={busy}
+            onClick={() => pick(n)}
+            className={`min-h-11 min-w-11 rounded-sm border-2 px-3 font-num text-sm font-semibold sm:min-h-9 sm:min-w-9 ${
+              value === n ? "border-trace-magenta text-slate-800" : "border-slate-300 text-slate-600 hover:border-slate-400"
+            }`}
+          >
+            {n}
+          </button>
+        ))}
+      </div>
+      <span className="text-sm text-slate-600">ครั้ง · เก็บคะแนนครั้งที่ดีที่สุด · ระหว่างเล่นบอกแค่ถูก/ผิด เฉลยเปิดหลังเล่นครบหรือกดจบเอง</span>
+      {error && <p role="alert" className="w-full text-sm text-red-700">{error}</p>}
+    </div>
+  );
+}
+
 function ThemePicker({ gameId, value, onChanged }: { gameId: string; value: ThemeId; onChanged: () => void }) {
   const supabase = createClient();
   const [busy, setBusy] = useState<ThemeId | null>(null);

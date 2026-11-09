@@ -11,7 +11,7 @@ import { CharacterSprite, type CharacterId } from "./sprites";
 type Phase =
   | { kind: "loading" }
   | { kind: "error"; message: string; courseId: string | null }
-  | { kind: "intro"; title: string; description: string | null; stages: GameStage[]; courseId: string }
+  | { kind: "intro"; title: string; description: string | null; stages: GameStage[]; courseId: string; maxAttempts: number }
   | { kind: "playing"; data: GamePayload; courseId: string }
   | { kind: "done"; data: GamePayload; courseId: string };
 
@@ -32,9 +32,9 @@ export default function PlayGamePage({ params }: { params: Promise<{ gameId: str
   }, []);
 
   const start = useCallback(
-    async (courseId: string) => {
+    async (courseId: string, isNew = false) => {
       setPhase({ kind: "loading" });
-      const { data, error } = await supabase.rpc("game_start", { p_game: gameId });
+      const { data, error } = await supabase.rpc("game_start", { p_game: gameId, p_new: isNew });
       if (error) return setPhase({ kind: "error", message: gameErrorMessage(error.message), courseId });
       const payload = data as GamePayload;
       setPhase(payload.finished ? { kind: "done", data: payload, courseId } : { kind: "playing", data: payload, courseId });
@@ -46,7 +46,7 @@ export default function PlayGamePage({ params }: { params: Promise<{ gameId: str
     async function init() {
       const { data: game, error } = await supabase
         .from("games")
-        .select("id, course_id, title, description, stages")
+        .select("id, course_id, title, description, stages, max_attempts")
         .eq("id", gameId)
         .maybeSingle();
       if (error || !game) return setPhase({ kind: "error", message: "ไม่พบเกมนี้", courseId: null });
@@ -60,6 +60,7 @@ export default function PlayGamePage({ params }: { params: Promise<{ gameId: str
         description: game.description,
         stages: (game.stages as GameStage[]) ?? [],
         courseId: game.course_id,
+        maxAttempts: game.max_attempts ?? 3,
       });
     }
     const t = setTimeout(init, 0);
@@ -97,6 +98,14 @@ export default function PlayGamePage({ params }: { params: Promise<{ gameId: str
             data={phase.data}
             courseId={phase.courseId}
             hero={<CharacterSprite id={character} className="sprite-idle mx-auto h-24 w-auto" />}
+            onRetry={() => start(phase.courseId, true)}
+            onConclude={async () => {
+              const courseId = phase.courseId;
+              setPhase({ kind: "loading" });
+              const { data, error } = await supabase.rpc("game_conclude", { p_play: phase.data.play_id });
+              if (error) return setPhase({ kind: "error", message: gameErrorMessage(error.message), courseId });
+              setPhase({ kind: "done", data: data as GamePayload, courseId });
+            }}
           />
         )}
       </div>
