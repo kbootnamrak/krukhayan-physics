@@ -113,32 +113,37 @@ export default function GamesPanel({
     <ul className="space-y-3">
       {visible.map(({ g, play, open }) => {
         const done = !!play?.finished_at;
+        const best = play?.best_score != null ? Number(play.best_score) : null;
+        const over = !!play && (play.revealed || play.attempts_used >= play.max_attempts);
         return (
           <li key={g.id} className="flex flex-wrap items-center gap-3 rounded-sm border-2 border-slate-200 bg-white p-4">
             <GameIcon />
             <span className="min-w-0 basis-[calc(100%-3rem)] sm:basis-0 sm:flex-1">
               <span className="block font-display text-lg font-semibold text-slate-800">{g.title}</span>
               <span className="block text-sm text-slate-500">
-                {done
-                  ? `เล่นจบแล้ว · ${Number(play!.xp).toLocaleString()} XP`
-                  : play
-                    ? `เล่นค้างไว้ ${play.answered} ข้อ`
-                    : `${g.stages.length} ด่าน · ตอบแล้วรู้ผลทันที`}
+                {!play
+                  ? `${g.stages.length} ด่าน · เล่นได้ ${g.max_attempts ?? 3} ครั้ง เก็บคะแนนดีที่สุด`
+                  : !done
+                    ? `เล่นค้างไว้ครั้งที่ ${play.attempts_used} · ตอบไป ${play.answered} ข้อ`
+                    : over
+                      ? `จบแล้ว · เล่น ${play.attempts_used} ครั้ง · ดูเฉลยได้`
+                      : `เล่นแล้ว ${play.attempts_used}/${play.max_attempts} ครั้ง · เล่นอีกได้ ${play.max_attempts - play.attempts_used} ครั้ง`}
               </span>
             </span>
-            {done && (
-              <span className="font-num tnum text-2xl font-semibold text-slate-800">
-                {Number(play!.score)} <span className="text-base text-slate-500">/ {Number(play!.max_score)}</span>
+            {best != null && (
+              <span className="text-right font-num tnum text-2xl font-semibold text-slate-800">
+                {best} <span className="text-base text-slate-500">/ {Number(play!.max_score)}</span>
+                <span className="block font-sans text-xs font-normal text-slate-500">คะแนนดีที่สุด</span>
               </span>
             )}
             {(done || open) && (
               <Link
                 href={`/dashboard/games/${g.id}/play`}
                 className={`ml-auto inline-flex min-h-12 items-center justify-center rounded-sm px-5 py-2 text-sm font-semibold sm:ml-0 sm:min-h-0 ${
-                  done ? "border-2 border-porcelain text-slate-800 hover:bg-slate-100" : "bg-[oklch(50%_0.24_345)] text-[oklch(100%_0_0)] hover:bg-[oklch(55%_0.25_345)]"
+                  done && over ? "border-2 border-porcelain text-slate-800 hover:bg-slate-100" : "bg-[oklch(50%_0.24_345)] text-[oklch(100%_0_0)] hover:bg-[oklch(55%_0.25_345)]"
                 }`}
               >
-                {done ? "ดูผล" : play ? "เล่นต่อ" : "เริ่มภารกิจ"}
+                {!play ? "เริ่มภารกิจ" : !done ? "เล่นต่อ" : over ? "ดูผลและเฉลย" : "ดูผล / เล่นอีกครั้ง"}
               </Link>
             )}
           </li>

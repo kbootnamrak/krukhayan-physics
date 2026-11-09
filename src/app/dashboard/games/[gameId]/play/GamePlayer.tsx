@@ -8,7 +8,7 @@ import { CHOICE_LETTERS, formatNumber, type GamePayload, type GameStage } from "
 
 /** ส่วนประกอบของเกมภารกิจ: หน้าเริ่ม · สรุปผล (จอเกมและแผงโจทย์อยู่ใน GameScreen.tsx) */
 
-export type IntroInfo = { title: string; description: string | null; stages: GameStage[]; courseId: string };
+export type IntroInfo = { title: string; description: string | null; stages: GameStage[]; courseId: string; maxAttempts: number };
 
 export function BackLink({ courseId, label = "กลับไปหน้ารายวิชา" }: { courseId: string; label?: string }) {
   return (
@@ -61,10 +61,13 @@ export function Intro({ phase, onStart, children }: { phase: IntroInfo; onStart:
       {children}
 
       <ul className="list-disc space-y-1.5 pl-5 text-sm text-slate-600">
-        <li>ตอบแล้วรู้ผลทันที พร้อมคำอธิบาย — <b className="text-slate-800">คะแนนนับเฉพาะคำตอบแรก</b></li>
+        <li>
+          เล่นได้ <b className="text-slate-800">{phase.maxAttempts} ครั้ง เก็บคะแนนครั้งที่ดีที่สุด</b> — ระหว่างเล่นบอกแค่ถูก/ผิด
+          เฉลยและคำอธิบายเปิดหลังเล่นครบ (หรือกดจบเอง) · ตัวเลือกสลับที่ทุกครั้ง
+        </li>
         <li>เจอศัตรูต้องตอบโจทย์ — <b className="text-slate-800">แตะตัวเลือกเพื่อเล็ง แตะซ้ำอีกครั้งเพื่อยิง</b> ตอบผิดโดนโจมตีเสียหัวใจ</li>
         <li>ตอบถูกต่อเนื่องได้คอมโบ ตอบเร็วได้โบนัส XP (หัวใจและ XP ไม่ใช่คะแนนเก็บ)</li>
-        <li>ปิดหน้าแล้วกลับมาเล่นต่อจากข้อที่ค้างได้ แต่เล่นซ้ำเพื่อเอาคะแนนใหม่ไม่ได้</li>
+        <li>ปิดหน้าแล้วกลับมาเล่นต่อจากข้อที่ค้างได้</li>
       </ul>
 
       <div className="flex flex-col gap-3 sm:flex-row">
@@ -88,11 +91,27 @@ function rankOf(pct: number) {
   if (pct >= 90) return { rank: "S", note: "สุดยอด! เข้าใจครบแทบทุกเรื่อง" };
   if (pct >= 75) return { rank: "A", note: "เก่งมาก เหลืออีกนิดเดียว" };
   if (pct >= 60) return { rank: "B", note: "ผ่านภารกิจ ทบทวนข้อที่พลาดอีกครั้งนะ" };
-  return { rank: "C", note: "ลองอ่านคำอธิบายข้อที่พลาดด้านล่าง แล้วถามครูได้เลย" };
+  return { rank: "C", note: "ทบทวนเนื้อหาอีกนิด แล้วถามครูได้เลย" };
 }
 
-export function Results({ data, courseId, hero }: { data: GamePayload; courseId: string; hero?: React.ReactNode }) {
+export function Results({
+  data,
+  courseId,
+  hero,
+  onRetry,
+  onConclude,
+}: {
+  data: GamePayload;
+  courseId: string;
+  hero?: React.ReactNode;
+  /** เล่นครั้งใหม่ */
+  onRetry: () => void;
+  /** จบ ไม่เล่นต่อ แล้วเปิดเฉลย */
+  onConclude: () => void;
+}) {
   const score = Number(data.score);
+  const bestScore = data.best_score == null ? score : Number(data.best_score);
+  const left = Math.max(0, data.max_attempts - data.attempts_used);
   const max = Number(data.max_score);
   const pct = max ? (score / max) * 100 : 0;
   const { rank, note } = rankOf(pct);
@@ -111,7 +130,9 @@ export function Results({ data, courseId, hero }: { data: GamePayload; courseId:
       <section className="stage-enter space-y-4 rounded-sm border-2 border-porcelain bg-white p-6 text-center">
         {hero}
         <h1 className="font-display text-2xl font-bold text-slate-800">ภารกิจสำเร็จ</h1>
-        <p className="-mt-2 text-slate-600">{data.title}</p>
+        <p className="-mt-2 text-slate-600">
+          {data.title} · ครั้งที่ {data.attempt}/{data.max_attempts}
+        </p>
         <div className="flex items-center justify-center gap-6">
           <span
             className="grid size-20 place-items-center rounded-full border-[3px] border-trace-yellow font-display text-4xl font-bold text-trace-yellow route-glow"
@@ -122,10 +143,15 @@ export function Results({ data, courseId, hero }: { data: GamePayload; courseId:
           <p className="text-left font-num tnum">
             <span className="text-5xl font-bold text-slate-800">{score}</span>
             <span className="text-2xl text-slate-500"> / {max}</span>
-            <span className="block font-sans text-sm text-slate-500">คะแนนเก็บ</span>
+            <span className="block font-sans text-sm text-slate-500">คะแนนครั้งนี้</span>
           </p>
         </div>
         <p className="text-slate-600">{note}</p>
+        <p className="rounded-sm border-2 border-trace-yellow px-3 py-2 text-slate-700">
+          คะแนนเก็บ (ครั้งที่ดีที่สุด){" "}
+          <b className="font-num tnum text-2xl text-slate-800">{bestScore}</b>
+          <span className="font-num tnum text-slate-500"> / {max}</span>
+        </p>
         <dl className="grid grid-cols-3 gap-2 text-center">
           <div className="rounded-sm border border-slate-200 p-2">
             <dt className="text-xs text-slate-500">ตอบถูก</dt>
@@ -142,10 +168,40 @@ export function Results({ data, courseId, hero }: { data: GamePayload; courseId:
             <dd className="font-num tnum text-lg font-semibold text-slate-800">{best ? `×${best}` : "–"}</dd>
           </div>
         </dl>
-        <BackLink courseId={courseId} />
+        {data.can_retry ? (
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={onRetry}
+              className="min-h-12 w-full rounded-sm bg-[oklch(50%_0.24_345)] px-6 font-display text-lg font-bold text-[oklch(100%_0_0)] hover:bg-[oklch(55%_0.25_345)]"
+            >
+              เล่นอีกครั้ง (เหลือ {left} ครั้ง)
+            </button>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm(`จบเกมนี้และดูเฉลย?\nจะเล่นอีกไม่ได้ (เหลือ ${left} ครั้งจะถูกยกเลิก) คะแนนเก็บ = ${bestScore}`)) onConclude();
+                }}
+                className="min-h-12 flex-1 rounded-sm border-2 border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+              >
+                จบและดูเฉลย
+              </button>
+              <BackLink courseId={courseId} label="ไว้เล่นทีหลัง" />
+            </div>
+          </div>
+        ) : (
+          <BackLink courseId={courseId} />
+        )}
       </section>
 
-      {wrong.length > 0 && (
+      {!data.revealed && wrong.length > 0 && (
+        <p className="rounded-sm border border-slate-200 bg-white p-4 text-sm text-slate-600">
+          ครั้งนี้พลาด {wrong.length} ข้อ — เฉลยและคำอธิบายจะเปิดให้ดูเมื่อเล่นครบ {data.max_attempts} ครั้ง หรือกด &quot;จบและดูเฉลย&quot;
+        </p>
+      )}
+
+      {data.revealed && wrong.length > 0 && (
         <section aria-label="ทบทวนข้อที่พลาด" className="space-y-3">
           <h2 className="font-display text-lg font-semibold text-slate-800">ทบทวนข้อที่พลาด ({wrong.length} ข้อ)</h2>
           {wrong.map((it) => {
