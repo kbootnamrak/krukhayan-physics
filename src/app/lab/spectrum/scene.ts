@@ -50,6 +50,7 @@ export function createSpectrumScene(canvas: HTMLCanvasElement, initial: SceneSta
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
+  renderer.localClippingEnabled = true; // ใช้ตัดแถบสเปกตรัมต่อเนื่องให้เห็นเฉพาะช่วงที่ตัวชี้อยู่
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color("#04060e");
@@ -210,7 +211,26 @@ export function createSpectrumScene(canvas: HTMLCanvasElement, initial: SceneSta
   const streakBottom = RULER_Y - 0.03;
   const streakH = TUBE_TOP - streakBottom;
 
+  // สเปกตรัมไม่ได้โชว์ตลอด — เห็นเฉพาะเมื่อเลื่อนตัวชี้ไปถึงตำแหน่งนั้น (นักเรียนต้องกวาดหาเอง)
+  const FIND_SIGMA = 0.006; // เส้นเริ่มเรืองเมื่อตัวชี้เข้าใกล้ราว 1 ซม. สว่างสุดเมื่อทับพอดี
+  const LAMP_WINDOW = 0.012; // แถบสีต่อเนื่องเห็นช่วงกว้าง ±1.2 ซม. รอบตัวชี้
+  const lineMeshes: { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; base: THREE.Color; x: number }[] = [];
+  const clipLeft = new THREE.Plane(new THREE.Vector3(1, 0, 0), 0);
+  const clipRight = new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0);
+
+  function applyProximity() {
+    const p = state.pointer;
+    clipLeft.constant = -(p - LAMP_WINDOW);
+    clipRight.constant = p + LAMP_WINDOW;
+    for (const l of lineMeshes) {
+      const k = Math.exp(-(((p - l.x) / FIND_SIGMA) ** 2));
+      l.mesh.visible = k > 0.02;
+      l.mat.color.copy(l.base).multiplyScalar(k);
+    }
+  }
+
   function rebuildSpectra() {
+    lineMeshes.length = 0;
     spectra.clear();
     spectrumMats.splice(0).forEach((m) => m.dispose());
     spectrumGeos.splice(0).forEach((g) => g.dispose());
@@ -234,7 +254,7 @@ export function createSpectrumScene(canvas: HTMLCanvasElement, initial: SceneSta
           colors.push(r * fade, g * fade, b * fade);
         }
         geo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
-        const mat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, side: THREE.DoubleSide });
+        const mat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, side: THREE.DoubleSide, clippingPlanes: [clipLeft, clipRight] });
         const mesh = new THREE.Mesh(geo, mat);
         mesh.position.set(side * (x0 + x1) / 2, streakBottom + streakH * 0.55, 0.0345);
         if (side < 0) mesh.scale.x = -1;
@@ -242,6 +262,7 @@ export function createSpectrumScene(canvas: HTMLCanvasElement, initial: SceneSta
         spectrumMats.push(mat);
         spectrumGeos.push(geo);
       }
+      applyProximity();
       return;
     }
     const lines: SpectralLine[] = state.source === "hydrogen" ? HYDROGEN_LINES : NEON_LINES;
@@ -249,24 +270,27 @@ export function createSpectrumScene(canvas: HTMLCanvasElement, initial: SceneSta
       const x = lineOffset(line.nm, D);
       if (x === null || x > RULER_HALF + 0.12) continue;
       const [r, g, b] = wavelengthToRgb(line.nm);
-      const mat = new THREE.MeshBasicMaterial({
-        map: streakTex,
-        color: new THREE.Color(r, g, b).multiplyScalar(0.55 + line.strength * 0.9),
-        transparent: true,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        toneMapped: false,
-        side: THREE.DoubleSide,
-      });
-      spectrumMats.push(mat);
+      const base = new THREE.Color(r, g, b).multiplyScalar(0.55 + line.strength * 0.9);
       for (const side of [-1, 1]) {
+        const mat = new THREE.MeshBasicMaterial({
+          map: streakTex,
+          color: base.clone(),
+          transparent: true,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          toneMapped: false,
+          side: THREE.DoubleSide,
+        });
+        spectrumMats.push(mat);
         const mesh = new THREE.Mesh(streakGeo, mat);
         // กว้างราวเท่าลำแก๊สในหลอด (ภาพของหลอด) — แกนกลางคมอยู่ที่ตำแหน่ง x พอดี
         mesh.scale.set(0.012, streakH, 1);
         mesh.position.set(side * x, streakBottom + streakH / 2, 0.0345);
         spectra.add(mesh);
+        lineMeshes.push({ mesh, mat, base, x: side * x });
       }
     }
+    applyProximity();
   }
 
   // ---------------------------------------------------------------- ปรับตามสถานะ
@@ -434,6 +458,7 @@ export function createSpectrumScene(canvas: HTMLCanvasElement, initial: SceneSta
       else if (state.distance !== prev.distance) rebuildSpectra();
       if (state.roomLight !== prev.roomLight) applyRoom();
       if (state.distance !== prev.distance || state.pointer !== prev.pointer) applyGeometry();
+      if (state.pointer !== prev.pointer) applyProximity();
       if (state.view !== prev.view) applyView(true);
       else if (state.view === "grating" && (state.zoom !== prev.zoom || state.distance !== prev.distance || (state.zoom && state.pointer !== prev.pointer))) applyView();
     },
